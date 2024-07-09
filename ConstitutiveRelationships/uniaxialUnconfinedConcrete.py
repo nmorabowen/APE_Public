@@ -165,7 +165,7 @@ if __name__ == "__main__":
         plt.show()
         
         fc210 = uniaxialUnconfinedConcrete('fc210', 210 * kgf / cm**2)
-        fc240 = uniaxialUnconfinedConcrete('fc240', 240 * kgf / cm**2, color=blueAPE)
+        fc240 = uniaxialUnconfinedConcrete('fc240', 240 * kgf / cm**2, color=blueAPE, eco=0.003, ec_sprall=0.008)
         fc280 = uniaxialUnconfinedConcrete('fc280', 280 * kgf / cm**2, color='red')
         fc350 = uniaxialUnconfinedConcrete('fc350', 350 * kgf / cm**2, color='grey')
         fc400 = uniaxialUnconfinedConcrete('fc400', 400 * kgf / cm**2, color='darkolivegreen')
