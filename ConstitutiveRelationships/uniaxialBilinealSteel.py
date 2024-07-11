@@ -13,7 +13,7 @@ set_default_plot_params()
 # ===============================================
 
 class uniaxialBilinealSteel:
-    def __init__(self, name, fy, fsu, esh=0.008, esu=0.012, Es=200000, Esh=7000, plot=False, delta=15, color='k', marker=None):
+    def __init__(self, name, fy, fsu, esh=0.008, esu=0.12, Es=200000, Esh=7000, plot=False, delta=15, color='k', marker=None):
         """
         Initialize the UniaxialAceroBilineal class.
 
