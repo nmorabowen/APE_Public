@@ -36,7 +36,7 @@ class uniaxialConfinedConcrete:
         color (str): Color for plotting the constitutive law.
     """
     
-    def __init__(self, name, fco, eco, b, h, rec, num_var_b, num_var_h, phi_longitudinal, num_est_perpendicular_b, num_est_perpendicular_h, phi_estribo, s, fye, esu_estribo, aprox=False, delta=50, plot=False, color='k', marker=None):
+    def __init__(self, name, fco, eco, b, h, rec, num_var_b, num_var_h, phi_longitudinal, num_est_perpendicular_b, num_est_perpendicular_h, phi_estribo, s, fye, esu_estribo, delta=50, plot=False, color='k', marker=None):
         """
         Initializes the uniaxialConfinedConcrete class instance.
 
@@ -56,7 +56,6 @@ class uniaxialConfinedConcrete:
             s (float): Spacing of stirrups.
             fye (float): Yield strength of stirrups.
             esu_estribo (float): Ultimate strain of stirrups.
-            aprox (bool): Use approximate method for compression resistance calculation. Default is False.
             delta (int): Number of data points for strain array. Default is 50.
             plot (bool): Whether to plot the constitutive law upon initialization. Default is False.
             color (str): Color for plotting. Default is 'k' (black).
@@ -78,6 +77,7 @@ class uniaxialConfinedConcrete:
         self.esu_estribo = esu_estribo
         self.color = color
         self.marker=marker
+        self.result={}
         
         try:
             # Calculated values
@@ -88,16 +88,23 @@ class uniaxialConfinedConcrete:
             self.As = self.num_var_long * pi * self.phi_longitudinal**2 / 4
             self.rho_confinado = self.As / self.Ac
             self.Ec = (5000 * (fco / MPa)**0.5) * MPa
+            
+            self.addResult('Ac', self.Ac)
+            self.addResult('As', self.As)
+            
+            self._setTable()
 
             self.rho_estribo_perp_b, self.rho_estribo_perp_h, self.ke, self.fl_perpendicular_b_efectivo, self.fl_perpendicular_h_efectivo = self.calculosConfinamiento()
-            self.fcc_ratio, self.fcc, self.ecc_ratio, self.ecc = self.calculosResistenciasCompresion(aprox)
+            self.fcc_ratio, self.fcc, self.ecc_ratio, self.ecc = self.calculosResistenciasCompresion()
             self.ecu, self.ecu_ratio = self.calculoUltimateStrain()
 
             self.Esec = self.fcc / self.ecc
             self.r = self.Ec / (self.Ec - self.Esec)
 
-            _, _, self.constitutiveLaw = self.relacionesConstitutivas(delta, plot)
-
+            self.addResult('r', self.r)
+            
+            _, _, self.constitutiveLaw = self.relacionesConstitutivas(delta)
+            
             if plot:
                 self.plot()
         except ZeroDivisionError:
@@ -110,6 +117,9 @@ class uniaxialConfinedConcrete:
     
     def __repr__(self) -> str:
         return f'{self.name}'
+
+    def addResult(self, key, value):
+        self.result[key]=value
         
     def calculosConfinamiento(self):
         """
@@ -146,17 +156,131 @@ class uniaxialConfinedConcrete:
             fl_perpendicular_b_efectivo = ke * fl_perpendicular_b
             fl_perpendicular_h_efectivo = ke * fl_perpendicular_h
 
+            self.addResult('wi # in b', num_w_en_b)
+            self.addResult('wi # in h', num_w_en_h)
+            self.addResult('wi Spacing in b', w_libre_b)
+            self.addResult('wi Spacing in h', w_libre_h)
+            self.addResult('Ai', Ai)
+            self.addResult('Acc', Acc)
+            self.addResult('Acc', s_libre)
+            self.addResult('Ae', Ae)
+            self.addResult('As Perpendicular to b', As_estribo_perp_b)
+            self.addResult('As Perpendicular to h', As_estribo_perp_h)
+            self.addResult('Rho Perpendicular to b', rho_estribo_perp_b)
+            self.addResult('Rho Perpendicular to h', rho_estribo_perp_h)
+            self.addResult('Lateral stress perpendicular to b', fl_perpendicular_b)
+            self.addResult('Lateral stress perpendicular to h', fl_perpendicular_h)
+            self.addResult('Effective lateral stress perpendicular to b', fl_perpendicular_b_efectivo)
+            self.addResult('Effective lateral stress perpendicular to h', fl_perpendicular_h_efectivo)
+            
             return rho_estribo_perp_b, rho_estribo_perp_h, ke, fl_perpendicular_b_efectivo, fl_perpendicular_h_efectivo
+        
         except Exception as e:
             print(f"Error in confinement calculations: {e}")
             return 0, 0, 0, 0, 0
-            
-    def calculosResistenciasCompresion(self, aprox=False):
+    
+    def _setTable(self):
+        # Function to set the multiaxial strenght values
+        self.Table = np.array([[1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00],
+                  [1.05, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13],
+                  [1.09, 1.19, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.25],
+                  [1.13, 1.23, 1.31, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37],
+                  [1.15, 1.26, 1.34, 1.41, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47],
+                  [1.18, 1.28, 1.38, 1.45, 1.51, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58],
+                  [1.20, 1.30, 1.40, 1.48, 1.55, 1.62, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67],
+                  [1.22, 1.32, 1.43, 1.51, 1.58, 1.65, 1.71, 1.76, 1.76, 1.76, 1.76, 1.76, 1.76, 1.76, 1.76, 1.76],
+                  [1.23, 1.35, 1.45, 1.53, 1.62, 1.68, 1.74, 1.81, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85],
+                  [1.25, 1.36, 1.47, 1.55, 1.64, 1.71, 1.77, 1.84, 1.88, 1.93, 1.93, 1.93, 1.93, 1.93, 1.93, 1.93],
+                  [1.26, 1.38, 1.48, 1.57, 1.66, 1.73, 1.80, 1.86, 1.92, 1.96, 2.00, 2.00, 2.00, 2.00, 2.00, 2.00],
+                  [1.27, 1.39, 1.50, 1.59, 1.68, 1.75, 1.83, 1.88, 1.94, 1.98, 2.02, 2.07, 2.07, 2.07, 2.07, 2.07],
+                  [1.28, 1.40, 1.52, 1.61, 1.70, 1.77, 1.85, 1.90, 1.96, 2.01, 2.06, 2.11, 2.14, 2.14, 2.14, 2.14],
+                  [1.29, 1.41, 1.52, 1.63, 1.71, 1.80, 1.87, 1.92, 1.99, 2.04, 2.09, 2.14, 2.18, 2.20, 2.20, 2.20],
+                  [1.30, 1.42, 1.54, 1.64, 1.73, 1.81, 1.88, 1.95, 2.01, 2.06, 2.11, 2.16, 2.20, 2.23, 2.26, 2.26],
+                  [1.30, 1.43, 1.55, 1.65, 1.74, 1.83, 1.90, 1.97, 2.03, 2.08, 2.13, 2.18, 2.22, 2.26, 2.29, 2.30]])
+
+        self.header = np.array([0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3])
+    
+    def plotMultiaxialStrenght2D(self):
+        Table=self.Table
+        header=self.header
+        # Create the figure with 2 subplots side by side
+        fig, axs = plt.subplots(1, 2, figsize=(20, 10))
+
+        # Subplot 1: Rows
+        for i, row in enumerate(Table):
+            axs[0].plot(header, row, label=f'$f\'_{{cc}}/f\'_{{co}}$ {header[i]}', color=blueAPE, linewidth=1.5)
+            axs[0].text(header[-1], row[-1], f'$f\'_{{l2}}/f\'_{{co}}$ = {np.round(header[i],2)}', fontsize=8, color='k', ha='left')
+
+        axs[0].set_xlabel('Smallest Confining Stress Ratio $f\'_{l1}/f\'_{co}$')
+        axs[0].set_xlim([0, 0.35])
+        xTicks = np.linspace(0, 0.3, 31)
+        axs[0].set_xticks(xTicks)
+        axs[0].set_xticklabels(xTicks, rotation=90)
+        axs[0].set_ylabel('Confined Strength Ratio $f\'_{cc}/f\'_{co}$')
+        axs[0].set_ylim([0.8, 2.5])
+        yTicks = np.linspace(1, 2.30, 27)
+        axs[0].set_yticks(yTicks)
+        axs[0].set_title('Confined Strength Ratio $f\'_{cc}/f\'_{co}$ vs. Smallest Confining Stress Ratio $f\'_{l1}/f\'_{co}$')
+        axs[0].grid(True)
+
+        # Subplot 2: Columns
+        for i in range(Table.shape[1]):
+            col = Table[:, i]
+            axs[1].plot(header, col, label=f'$f\'_{{cc}}/f\'_{header[i]}$', color=blueAPE, linewidth=1.5)
+            axs[1].text(header[-1], col[-1], f'$f\'_{{l1}}/f\'_{{co}}$ = {np.round(header[i],2)}', fontsize=8, color='k', ha='left')
+
+        axs[1].set_xlabel('Largest Confining Stress Ratio $f\'_{l2}/f\'_{co}$')
+        axs[1].set_xlim([0, 0.35])
+        axs[1].set_xticks(xTicks)
+        axs[1].set_xticklabels(xTicks, rotation=90)
+        axs[1].set_ylabel('Confined Strength Ratio $f\'_{cc}/f\'_{co}$')
+        axs[1].set_ylim([0.8, 2.5])
+        axs[1].set_yticks(yTicks)
+        axs[1].set_title('Confined Strength Ratio $f\'_{cc}/f\'_{co}$ vs. Largest Confining Stress Ratio $f\'_{l2}/f\'_{co}$')
+        axs[1].grid(True)
+
+
+        plt.tight_layout()
+        plt.show()
+    
+    def plotMultiaxialStrenght3D(self):
+        Table=self.Table
+        header=self.header
+        # Create meshgrid for plots
+        smallest, largest = np.meshgrid(header, header)
+        Z = Table
+
+        # Create the figure
+        fig = plt.figure(figsize=(20, 10))
+
+        # Subplot 1: Contour plot
+        ax1 = fig.add_subplot(1, 2, 1)
+        contour = ax1.contourf(smallest, largest, Z, cmap='viridis', levels=50)
+        contour_lines = ax1.contour(smallest, largest, Z, colors='black', linewidths=0.5, levels=25)
+        ax1.clabel(contour_lines, fmt='%2.2f', colors='black', fontsize=8)
+        fig.colorbar(contour, ax=ax1, label='Confined Strength Ratio $f\'_{cc}/f\'_{co}$')
+
+        ax1.set_xlabel('Smallest Confining Stress Ratio $f\'_{l1}/f\'_{co}$')
+        ax1.set_ylabel('Largest Confining Stress Ratio $f\'_{l2}/f\'_{co}$')
+        ax1.set_title('Contour Plot of Confined Strength Ratio $f\'_{cc}/f\'_{co}$')
+        ax1.grid(True)
+
+        # Subplot 2: 3D surface plot
+        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+        surf = ax2.plot_surface(smallest, largest, Z, cmap='viridis')
+        # Add color bar which maps values to colors
+        fig.colorbar(surf, ax=ax2, shrink=0.5, aspect=5, label='Confined Strength Ratio $f\'_{cc}/f\'_{co}$')
+        ax2.set_xlabel('Smallest Confining Stress Ratio $f\'_{l1}/f\'_{co}$')
+        ax2.set_ylabel('Largest Confining Stress Ratio $f\'_{l2}/f\'_{co}$')
+        ax2.set_zlabel('Confined Strength Ratio $f\'_{cc}/f\'_{co}$')
+        ax2.set_title('Multiaxial Strength Ratio $f\'_{cc}/f\'_{co}$')
+
+        plt.tight_layout()
+        plt.show()
+              
+    def calculosResistenciasCompresion(self):
         """
         Calculate compression resistances for the concrete.
-
-        Parameters:
-            aprox (bool): Use approximate method for compression resistance calculation. Default is False.
 
         Returns:
             fcc_ratio (float): Ratio of confined to unconfined compressive strength.
@@ -165,13 +289,17 @@ class uniaxialConfinedConcrete:
             ecc (float): Confined strain.
         """
         try:
-            fl1_ratio = self.fl_perpendicular_b_efectivo / self.fco
-            fl2_ratio = self.fl_perpendicular_h_efectivo / self.fco
-            rho_transversal = (self.rho_estribo_perp_b + self.rho_estribo_perp_h) * 0.50
-            fpl = rho_transversal * self.fye * self.ke
-            fcc_ratio_apox = (-1.254 + 2.254 * (1 + ((7.94 * fpl) / (self.fco)))**0.5 - 2 * (fpl / self.fco))
             
-            def calculoRatiofcc(fl1_ratio, fl2_ratio):
+            fl_b=self.fl_perpendicular_b_efectivo / self.fco
+            fl_h=self.fl_perpendicular_h_efectivo / self.fco
+            
+            fl1_ratio = np.minimum(fl_b, fl_h)
+            fl2_ratio = np.maximum(fl_b, fl_h)
+
+            Table = self.Table
+            header = self.header
+            
+            def calculoRatiofcc(fl1_ratio, fl2_ratio, Table, header):
                 """
                 Calculate the ratio of confined to unconfined compressive strength based on tabulated values.
 
@@ -182,24 +310,10 @@ class uniaxialConfinedConcrete:
                 Returns:
                     fcc_ratio (float): Ratio of confined to unconfined compressive strength.
                 """
-                Table = np.array([[1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00],
-                                  [1.05, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13, 1.13],
-                                  [1.09, 1.19, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26, 1.26],
-                                  [1.13, 1.23, 1.31, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37, 1.37],
-                                  [1.15, 1.26, 1.34, 1.41, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47, 1.47],
-                                  [1.18, 1.28, 1.38, 1.45, 1.51, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58, 1.58],
-                                  [1.20, 1.30, 1.40, 1.48, 1.55, 1.62, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67, 1.67],
-                                  [1.22, 1.32, 1.43, 1.51, 1.58, 1.65, 1.71, 1.76, 1.76, 1.76, 1.76, 1.76, 1.76, 1.76, 1.76, 1.76],
-                                  [1.23, 1.35, 1.45, 1.53, 1.62, 1.68, 1.74, 1.81, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85],
-                                  [1.25, 1.36, 1.47, 1.55, 1.64, 1.71, 1.77, 1.84, 1.88, 1.93, 1.93, 1.93, 1.93, 1.93, 1.93, 1.93],
-                                  [1.26, 1.38, 1.48, 1.57, 1.66, 1.73, 1.80, 1.86, 1.92, 1.96, 2.00, 2.00, 2.00, 2.00, 2.00, 2.00],
-                                  [1.27, 1.39, 1.50, 1.59, 1.68, 1.75, 1.83, 1.88, 1.94, 1.98, 2.02, 2.07, 2.07, 2.07, 2.07, 2.07],
-                                  [1.28, 1.40, 1.52, 1.61, 1.70, 1.77, 1.85, 1.90, 1.96, 2.01, 2.05, 2.09, 2.14, 2.14, 2.14, 2.14],
-                                  [1.29, 1.41, 1.52, 1.63, 1.71, 1.80, 1.87, 1.92, 1.99, 2.04, 2.08, 2.13, 2.16, 2.20, 2.20, 2.20],
-                                  [1.30, 1.42, 1.54, 1.64, 1.73, 1.81, 1.88, 1.95, 2.01, 2.06, 2.11, 2.16, 2.19, 2.23, 2.26, 2.26],
-                                  [1.30, 1.43, 1.55, 1.65, 1.74, 1.83, 1.89, 1.96, 2.03, 2.08, 2.13, 2.18, 2.22, 2.25, 2.29, 2.30]])
-
-                header = np.array([0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3])
+                # smallest values for fl1/fco in rows
+                # largest values of fl1/fco in cols
+                
+                
                 target_value = fl2_ratio
                 abs_diff = np.abs(header - target_value)
                 sorted_indices = np.argsort(abs_diff)
@@ -216,18 +330,18 @@ class uniaxialConfinedConcrete:
                 
                 return fcc_ratio
             
-            fcc_ratio_interpolado = calculoRatiofcc(fl1_ratio, fl2_ratio)
-            
-            if aprox is False:
-                fcc_ratio = fcc_ratio_interpolado
-            else:
-                fcc_ratio = fcc_ratio_apox
-            
+            fcc_ratio = calculoRatiofcc(fl1_ratio, fl2_ratio, Table, header)
             fcc = self.fco * fcc_ratio
             ecc_ratio = 1 + 5 * (fcc / self.fco - 1)
             ecc = ecc_ratio * self.eco
             
+            self.addResult('fcc ratio',fcc_ratio)
+            self.addResult('fcc',fcc)
+            self.addResult('ecc ratio',ecc_ratio)
+            self.addResult('ecc ratio',ecc)
+            
             return fcc_ratio, fcc, ecc_ratio, ecc
+        
         except Exception as e:
             print(f"Error in compression resistance calculations: {e}")
             return 0, 0, 0, 0
@@ -243,12 +357,13 @@ class uniaxialConfinedConcrete:
         try:
             ecu = 1.50 * (0.004 + 1.40 * ((self.rho_estribo_perp_b + self.rho_estribo_perp_h) * self.fye * self.esu_estribo) / (self.fcc))
             ecu_ratio = ecu / self.eco
+            self.addResult('ecu',ecu)
             return ecu, ecu_ratio
         except Exception as e:
             print(f"Error in ultimate strain calculation: {e}")
             return 0, 0
     
-    def relacionesConstitutivas(self, delta, plot):
+    def relacionesConstitutivas(self, delta):
         """
         Calculate the constitutive relationship of the concrete.
 
@@ -349,5 +464,8 @@ if __name__ == "__main__":
                                           plot=True,
                                           color=blueAPE)
         plt.show()
+        fc210c.plotMultiaxialStrenght2D()
+        fc210c.plotMultiaxialStrenght3D()
+        print(fc210c.result)
     except Exception as e:
         print(f"Error in main execution: {e}")
