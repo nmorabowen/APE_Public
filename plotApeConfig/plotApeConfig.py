@@ -2,7 +2,7 @@
 import matplotlib.pyplot as plt
 
 blueAPE='#000077'
-greyConcrete='#e4e4e4'
+grayConcrete='#e4e4e4'
 
 def set_default_plot_params():
     plt.rcParams['font.family'] = 'arial'
