@@ -2,6 +2,7 @@ import os
 import numpy as np
 import tkinter as tk
 from tkinter import filedialog
+from math import pi
 import sys
 
 # Function to check if a file exists and delete it
@@ -62,3 +63,15 @@ def matrixReplacement(matrix,matrixADD,rowsIDX,colsIDX):
     matrix[rows,cols]=matrix[rows,cols]+matrixADD
     
     return matrix
+
+def rebarArea(phi):
+    """ Funcion para calcular el area de acero de una varilla
+
+    Args:
+        phi (float): Diametro de la varilla longitudinal
+
+    Returns:
+        _type_: Area de la varilla longitudinal
+    """
+    area=pi*phi**2/4
+    return area
