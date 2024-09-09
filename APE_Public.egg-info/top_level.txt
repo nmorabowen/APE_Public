@@ -1,4 +1,7 @@
 ConstitutiveRelationships
+ModuleFE
 apeFunctions
 baseUnits
+gmshtools
 plotApeConfig
+responseSpectrum
