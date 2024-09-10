@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, FixedLocator
+import pandas as pd
+import os  # Import os to help with path handling
 
 class cyclicLoading:
     def __init__(self, loading_array=None, verbose=False, ax=None, plot_figure=False, dpi=150):
@@ -105,6 +107,22 @@ class cyclicLoading:
         # If no axis was provided, display the plot
         if self.ax is None:
             plt.show()
+            
+    def export_to_excel(self, filename="cyclic_loading.xlsx", export_path="."):
+        # Combine the export path and filename to form the full file path
+        full_path = os.path.join(export_path, filename)
+
+        # Create a DataFrame with cycles and loading values
+        df = pd.DataFrame({
+            'Cycles': self.cycles,
+            'Loading': self.loading
+        })
+
+        # Export to Excel
+        df.to_excel(full_path, index=False)
+
+        if self.verbose:
+            print(f"Data exported to {full_path}")
 
 # Only execute if running as the main module
 if __name__ == "__main__":
@@ -118,3 +136,4 @@ if __name__ == "__main__":
 
     # Example with default ATC loading protocol
     ATC_cyclic = cyclicLoading(verbose=True, plot_figure=True)
+    
