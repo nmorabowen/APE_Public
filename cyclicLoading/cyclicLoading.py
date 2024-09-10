@@ -77,15 +77,18 @@ class cyclicLoading:
     
     def plot(self):
         # Generate cyclic loads
-        cycles, loading = self.cycles, self.loading
+        cycles, loading, time = self.cycles, self.loading, self.time
 
         # Use the provided ax if available, otherwise create a new one
         if self.ax is None:
-            fig, ax = plt.subplots(figsize=(10, 5), dpi=self.dpi)
+            fig, ax1 = plt.subplots(figsize=(10, 5), dpi=self.dpi)  # Create the primary axis for time
         else:
-            ax = self.ax  # Use the provided ax
+            ax1 = self.ax  # Use the provided ax
 
-        # Create the x-locator array
+        # Create a second x-axis that shares the same y-axis
+        ax2 = ax1.twiny()  # Create a secondary x-axis for cycles
+
+        # Create the x-locator array for cycles
         x_locator_array = self.loading_array[:, 1]
         x_locator_array = [sum(x_locator_array[:i+1]) for i in range(len(x_locator_array))]
 
@@ -93,20 +96,23 @@ class cyclicLoading:
         y_min, y_max = np.min(self.loading_array[:, 0]), np.max(self.loading_array[:, 0])
         y_ticks = np.linspace(-y_max, y_max, num=7)  # Set fewer y-ticks (adjust 'num' as needed)
 
-        # Plot the cyclic loading
-        ax.plot(cycles, loading, color='#000077', label='Loading Protocol #1')
-        ax.grid(True, which='both')
-        ax.xaxis.grid(True, which='minor', linestyle='--', linewidth=0.5)
-        ax.set_xlim(xmin=0)
-        ax.set_xlabel('Cycles')
-        ax.set_ylabel('Rotation %')
-        ax.set_title('Loading Protocol #1')
-        ax.legend()
+        # Plot the cyclic loading against time on ax1
+        ax1.plot(time, loading, color='#000077', label='Loading Protocol #1')
+        ax1.set_xlim(0, 1)  # Time is between 0 and 1
+        ax1.set_xlabel('Time')
+        ax1.set_ylabel('Rotation %')
+        ax1.set_title('Loading Protocol with Dual X-Axis (Time and Cycles)')
+        ax1.grid(True, which='both')
+        ax1.legend(loc='upper left')
+
+        # Plot the cyclic loading against cycles on ax2
+        ax2.set_xlim(0, np.max(cycles))  # Set x-limits for cycles
+        ax2.set_xlabel('Cycles')
+        ax2.set_xticks(x_locator_array)  # Set custom x-ticks for cycles
+        ax2.xaxis.grid(True, which='both', linestyle='--', linewidth=0.5)
 
         # Set y-axis ticks to correspond to the reduced loading values
-        ax.yaxis.set_major_locator(FixedLocator(y_ticks))
-        ax.xaxis.set_major_locator(FixedLocator(x_locator_array))
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax1.yaxis.set_major_locator(FixedLocator(y_ticks))
 
         # If no axis was provided, display the plot
         if self.ax is None:
