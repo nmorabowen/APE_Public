@@ -24,7 +24,7 @@ class cyclicLoading:
         self._set_loading_array()
         
         # Create the cyclic information
-        self.cycles, self.loading = self.create_cyclic_loads()
+        self.cycles, self.loading, self.time = self.create_cyclic_loads()
         
         # If plot is enabled, call the plot method
         if self.plot_figure:
@@ -64,12 +64,16 @@ class cyclicLoading:
         # Create the array of cycles
         cycles = np.arange(0, total_cycles + 1, 0.50)
 
+        # Create the time array, scaled such that the last time value is 1
+        time = np.linspace(0, 1, len(cycles))
+        
         # Verbose output if required
         if self.verbose:
             print(f'The total number of cycles is: {total_cycles:.2f}')
             print(f'Each cycle magnitude is: {np.round(values, 2)}')
-
-        return cycles, loading
+            print(f'Time array: {np.round(time, 2)}')
+            
+        return cycles, loading, time
     
     def plot(self):
         # Generate cyclic loads
@@ -115,7 +119,8 @@ class cyclicLoading:
         # Create a DataFrame with cycles and loading values
         df = pd.DataFrame({
             'Cycles': self.cycles,
-            'Loading': self.loading
+            'Loading': self.loading,
+            'Time':self.time
         })
 
         # Export to Excel
