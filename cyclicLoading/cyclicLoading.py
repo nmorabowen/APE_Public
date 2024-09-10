@@ -65,7 +65,7 @@ class cyclicLoading:
         cycles = np.arange(0, total_cycles + 1, 0.50)
 
         # Create the time array, scaled such that the last time value is 1
-        time = np.linspace(0, 1, len(cycles))
+        time=cycles/total_cycles
         
         # Verbose output if required
         if self.verbose:
