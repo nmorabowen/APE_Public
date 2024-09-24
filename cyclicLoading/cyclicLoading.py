@@ -82,12 +82,17 @@ class cyclicLoading:
         # Use the provided ax if available, otherwise create a new one
         if self.ax is None:
             fig, ax1 = plt.subplots(figsize=(10, 5), dpi=self.dpi)  # Create the primary axis for time
+            fig.patch.set_alpha(0)  # Make the figure background transparent
         else:
             ax1 = self.ax  # Use the provided ax
 
+        ax1.patch.set_alpha(0)
+        
         # Create a second x-axis that shares the same y-axis
         ax2 = ax1.twiny()  # Create a secondary x-axis for cycles
 
+        ax2.patch.set_alpha(0)
+        
         # Create the x-locator array for cycles
         x_locator_array = self.loading_array[:, 1]
         x_locator_array = [sum(x_locator_array[:i+1]) for i in range(len(x_locator_array))]
