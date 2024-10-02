@@ -141,7 +141,7 @@ class cyclicLoading:
             print(f"Data exported to {full_path}")
 
 class cyclicLoading_v2:
-    def __init__(self, Delta=1, loading_array=None, unitTime=True, unitCycle=True, verbose=False, ax=None, plot_figure=False, dpi=150):
+    def __init__(self, Delta=1, loading_array=None, unitTime=None, unitCycle=None, verbose=False, ax=None, plot_figure=False, dpi=150):
         # Initialize the loading array and other attributes
         self.Delta=Delta
         self.loading_array = loading_array
@@ -193,15 +193,15 @@ class cyclicLoading_v2:
         # Create the cumulative time array
         time = np.cumsum(delta_array)
         
-        if self.unitTime is True:
-            time=time/np.max(time)
+        if self.unitTime is not None:
+            time=time/np.max(time)*self.unitTime
 
         # Initialize cycles array and populate values at every 4th index
         cycles=self.loading_array[:,0]
         
         # Unitarize time and cycle if needed
-        if self.unitCycle is True:
-            cycles=cycles/np.max(cycles)
+        if self.unitCycle is not None:
+            cycles=cycles/np.max(cycles)*self.unitCycle
         
         cycles=np.repeat(cycles, repetitions, axis=None)
         cycles_array = np.zeros(len(time))
@@ -280,3 +280,8 @@ if __name__ == "__main__":
 
     # Example with default ATC loading protocol
     ATC_cyclic = cyclicLoading_v2(verbose=True, plot_figure=True)
+    ATC_cyclic = cyclicLoading_v2(unitTime=2,verbose=True, plot_figure=True)
+    ATC_cyclic = cyclicLoading_v2(unitCycle=3, plot_figure=True)
+    
+    
+    
