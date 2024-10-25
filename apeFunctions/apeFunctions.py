@@ -75,3 +75,7 @@ def rebarArea(phi):
     """
     area=pi*phi**2/4
     return area
+
+def getShearModulus(E,nu):
+    G=(E)/(2*(1+nu))
+    return G
