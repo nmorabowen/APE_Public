@@ -51,6 +51,12 @@ class WSection:
         self.y_cm = self.y_center_mass()
         self.Zx = self.plastic_section_modulus()
 
+    def __str__(self):
+        """
+        Returns a formatted string representation of the W-section.
+        """
+        return f"WSection: {self.bf}x{self.tf} - {self.h}x{self.tw}"
+
     def area(self):
         """
         Calculates the gross area of the W-section.
@@ -73,7 +79,6 @@ class WSection:
         """
         # Using your original formula for half the beam's centroid calculation.
         area_momentum = ((self.h / 2 * self.tw) * (self.h / 4) + (self.bf * self.tf) * (self.h / 2 + self.tf / 2))
-        print(f"Area Moment = {area_momentum:.2f}")
         y_cm = area_momentum / (self.Ag / 2)
         return y_cm
 
