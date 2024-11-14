@@ -55,7 +55,7 @@ class WSection:
         """
         Returns a formatted string representation of the W-section.
         """
-        return f"WSection: {self.bf}x{self.tf} - {self.h}x{self.tw}"
+        return f"W{self.bf}x{self.tf}-{self.h}x{self.tw}"
 
     def area(self):
         """
