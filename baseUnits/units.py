@@ -44,9 +44,9 @@ oz = 28.3495 * 10**-6  # [tonne]
 # Pressure
 MPa=1 #[MPa]
 kPa=1*10**-3 #[MPa]
-GPa=1000 #[Pa]
+GPa=1000 #[MPa]
 kgf_cm2=0.09807 #[MPa]
-Pa=10**6 #[MPa]
+Pa=10**-6 #[MPa]
 ksi=6.895 #[MPa]
 
 # Energy
@@ -75,7 +75,7 @@ month = 30 * day  # [s]  # approximate
 year = 365.25 * day  # [s]  # average including leap years
 
 # Acceleration
-g = 9.81 * m / s**2
+g = 9.81 * mm / s**2
 
 # Angle
 radian = 1  # [rad]
