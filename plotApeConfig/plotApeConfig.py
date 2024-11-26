@@ -1,5 +1,6 @@
 # plot_config.py
 import matplotlib.pyplot as plt
+from cycler import cycler
 
 blueAPE='#000077'
 grayConcrete='#e4e4e4'
@@ -11,6 +12,8 @@ def set_default_plot_params():
     plt.rcParams['grid.linestyle'] = '--'
     plt.rcParams['grid.linewidth'] = 0.5
     plt.rcParams['axes.grid'] = True
+    # Set the color cycle globally
+    plt.rcParams['axes.prop_cycle'] = cycler(color=color_palette)
     
 color_palette = [
     blueAPE,
