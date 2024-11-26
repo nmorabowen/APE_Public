@@ -48,8 +48,10 @@ class WSection:
 
         # Calculated properties
         self.Ag = self.area()
-        self.y_cm = self.y_center_mass()
-        self.Zx = self.plastic_section_modulus()
+        self.Ix, self.Iy=self.calculate_moment_inercia()
+        self.y_cm, self.x_cm = self.y_center_mass()
+        self.Sx, self.Sy = self.section_modulus()
+        self.Zx, self.Zy = self.plastic_section_modulus()
 
     def __str__(self):
         """
@@ -69,6 +71,11 @@ class WSection:
         web_area = self.h * self.tw
         return flange_area + web_area
 
+    def calculate_moment_inercia(self):
+        Ix=(self.bf*(self.h+self.tf*2)**3/12)-((self.bf-self.tw)*self.h**3/12)
+        Iy=(2)*(self.tf*self.bf**3/12)+(self.h*self.tw**3/12)
+        return Ix, Iy
+
     def y_center_mass(self):
         """
         Calculates the centroid (center of mass) of half the W-section.
@@ -78,9 +85,20 @@ class WSection:
         - y_cm (float): Centroid of half the beam (mm).
         """
         # Using your original formula for half the beam's centroid calculation.
-        area_momentum = ((self.h / 2 * self.tw) * (self.h / 4) + (self.bf * self.tf) * (self.h / 2 + self.tf / 2))
-        y_cm = area_momentum / (self.Ag / 2)
-        return y_cm
+        area_momentum_y = ((self.h / 2 * self.tw) * (self.h / 4) + (self.bf * self.tf) * (self.h / 2 + self.tf / 2))
+        y_cm = area_momentum_y / (self.Ag / 2)
+        
+        area_momentum_x=2*((self.tf*self.bf/2)*(self.bf/4))+((self.h*self.tw/2)*(self.tw/4))
+        x_cm=area_momentum_x/(self.Ag/2)
+        
+        return y_cm, x_cm
+    
+    def section_modulus(self):
+        c_x=self.h/2+self.tf
+        c_y=self.bf/2
+        Sx=self.Ix/c_x
+        Sy=self.Iy/c_y
+        return Sx, Sy
 
     def plastic_section_modulus(self):
         """
@@ -91,7 +109,8 @@ class WSection:
         - Zx (float): Plastic section modulus (mm³).
         """
         Zx = self.y_cm * self.Ag
-        return Zx
+        Zy=self.x_cm*self.Ag
+        return Zx, Zy
 
     def calculate_expected_moment_capacity(self):
         """
@@ -131,8 +150,18 @@ class WSection:
         """
         print("WSection Properties:")
         print(f"Gross Area (Ag): {np.round(self.Ag, 3)}")
+        
+        print(f'Moment of inercia in the strong axis is: {np.round(self.Ix,0)}')
+        print(f'Moment of inercia in the weak axis is: {np.round(self.Iy,0)}')
+        
+        print(f'Section Modulus in the strong axis (Sx): {np.round(self.Sx,0)}')
+        print(f'Section Modulus in the weak axis (Sy) : {np.round(self.Sy,0)}')
+        
         print(f"Centroid of Half the Beam (y_cm): {np.round(self.y_cm, 3)}")
-        print(f"Plastic Section Modulus (Zx): {np.round(self.Zx, 3)}")
+        print(f"Plastic Section Modulus in the strong axis (Zx): {np.round(self.Zx, 3)}")
+        
+        print(f"Centroid of Half the Beam (x_cm): {np.round(self.x_cm, 3)}")
+        print(f"Plastic Section Modulus in the weak axis (Zy): {np.round(self.Zy, 3)}")
 
 
 if __name__ == "__main__":
@@ -140,7 +169,7 @@ if __name__ == "__main__":
     Gr50 = Material(Fy=355, E=210000, gamma=78.5, Ry=1.1)
 
     # Define W-section dimensions (example values in mm)
-    W1 = WSection(bf=180, tf=15, h=450, tw=8, material=Gr50)
+    W1 = WSection(bf=300, tf=22, h=350, tw=12, material=Gr50)
 
     # Display summary of the section properties
     W1.summary()
