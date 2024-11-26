@@ -143,6 +143,12 @@ class WSection:
         Ag = self.Ag
         Mn = Zx * (Fy - Pu / Ag)
         return Mn
+    
+    def calculate_shear_capacity(self):
+        Vn=0.60*self.material.Fy*self.Ag
+        phiVn=0.90*Vn
+        Vp=0.60*self.material.Fy*self.Ag*self.material.Ry
+        return phiVn, Vn, Vp
 
     def summary(self):
         """
