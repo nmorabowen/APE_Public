@@ -18,8 +18,10 @@ def set_default_plot_params():
 color_palette = [
     blueAPE,
     'k',
-    '#4daf4a',  # Dark Green
+    'blue',
+    '#999999',  # Dark Gray
     grayConcrete,
+    '#4daf4a',  # Dark Green
     '#984ea3',  # Dark Purple
     '#ff7f00',  # Dark Orange
     '#e41a1c',  # Dark Red
@@ -27,7 +29,6 @@ color_palette = [
     '#a65628',  # Dark Brown
     '#377eb8',  # Dark Blue
     '#f781bf',  # Dark Pink
-    '#999999',  # Dark Gray
     '#dede00',  # Dark Lime
     '#1b9e77',  # Dark Teal
     '#d95f02',  # Dark Burnt Orange
