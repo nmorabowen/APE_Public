@@ -73,6 +73,6 @@ if __name__ == "__main__":
     print(database.df.head())
 
     # Example: Get properties for a specific section
-    results=database.get_properties(section_name="w12x6", verbose=True)
+    results=database.get_properties(section_name="w24x96", verbose=True)
     
     
