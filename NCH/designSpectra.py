@@ -266,8 +266,8 @@ class NCh433:
             Rx_given=np.array([Rx, Rx, 0])
             Rx_mod_given=np.array([0, Rx_mod, Rx_mod])
             ax[0,0].plot(Rx_given,Rx_mod_given, color='red', linestyle='--', linewidth=1.0)
-            ax[0,0].annotate(f'Ro* = {np.round(Rx_given,2)}', 
-                        (Rx_given-0.4,Ro_min), 
+            ax[0,0].annotate(f'Ro* = {np.round(Rx,2)}', 
+                        (Rx-0.4,Ro_min), 
                         ha='left',
                         rotation=90)
             
@@ -276,8 +276,8 @@ class NCh433:
             Ry_given=np.array([Ry, Ry, 0])
             Ry_mod_given=np.array([0, Ry_mod, Ry_mod])
             ax[0,1].plot(Ry_given,Ry_mod_given, color='red', linestyle='--', linewidth=1.0)
-            ax[0,1].annotate(f'Ro* = {np.round(Ry_given,2)}', 
-                        (Ry_given-0.4,Ro_min), 
+            ax[0,1].annotate(f'Ro* = {np.round(Ry,2)}', 
+                        (Ry-0.4,Ro_min), 
                         ha='left',
                         rotation=90)
         
