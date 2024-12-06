@@ -193,7 +193,7 @@ class NCh433:
     def R_ratio(T, Ro, To):
             return (1 + (T) / (0.10 * To + T / Ro))/Ro
         
-    def calcular_R_mod(self, Tx, Ty, Ro_min=2, Ro_max=11, num_div_Ro_array=10):
+    def calcular_R_mod(self, Tx, Ty, Ro_min=2, Ro_max=11, num_div_Ro_array=10, Rx=None, Ry=None):
         
         To=self.To
 
@@ -203,6 +203,18 @@ class NCh433:
         ratio_x=self.R_ratio(Tx,Ro_array,To)
         ratio_y=self.R_ratio(Ty,Ro_array,To)
 
+        if Rx is not None:
+            linear_interp = interp1d(Ro_array, R_mod_x, kind='linear', fill_value='extrapolate')
+            Rx_mod=linear_interp(Rx)
+        else:
+            Rx_mod=None
+
+        if Ry is not None:
+            linear_interp = interp1d(Ro_array, R_mod_y, kind='linear', fill_value='extrapolate')
+            Ry_mod=linear_interp(Ry)
+        else:
+            Ry_mod=None
+        
         R_results={
             'Tx':Tx,
             'Ty':Ty,
@@ -210,7 +222,11 @@ class NCh433:
             'R_mod_x':R_mod_x,
             'R_mod_y':R_mod_y,
             'ratio_x':ratio_x,
-            'ratio_y':ratio_y
+            'ratio_y':ratio_y,
+            'Rx':Rx,
+            'Ry':Ry,
+            'Rx*':Rx_mod,
+            'Ry*':Ry_mod
         }
         
         return R_results
@@ -226,6 +242,10 @@ class NCh433:
         ratio_y=R_results['ratio_y']
         Ro_min=np.min(Ro_array)
         Ro_max=np.max(Ro_array)
+        Rx=R_results['Rx']
+        Rx_mod=R_results['Rx*']
+        Ry=R_results['Ry']
+        Ry_mod=R_results['Ry*']
         
         fig, ax = plt.subplots(2,2, figsize=(10,10))
         
@@ -240,6 +260,27 @@ class NCh433:
                         (Ro_intersection-0.4,Ro_min), 
                         ha='left',
                         rotation=90)
+        
+        if Rx is not None:
+            # Given point array
+            Rx_given=np.array([Rx, Rx, 0])
+            Rx_mod_given=np.array([0, Rx_mod, Rx_mod])
+            ax[0,0].plot(Rx_given,Rx_mod_given, color='red', linestyle='--', linewidth=1.0)
+            ax[0,0].annotate(f'Ro* = {np.round(Rx_given,2)}', 
+                        (Rx_given-0.4,Ro_min), 
+                        ha='left',
+                        rotation=90)
+            
+        if Ry is not None:
+            # Given point array
+            Ry_given=np.array([Ry, Ry, 0])
+            Ry_mod_given=np.array([0, Ry_mod, Ry_mod])
+            ax[0,1].plot(Ry_given,Ry_mod_given, color='red', linestyle='--', linewidth=1.0)
+            ax[0,1].annotate(f'Ro* = {np.round(Ry_given,2)}', 
+                        (Ry_given-0.4,Ro_min), 
+                        ha='left',
+                        rotation=90)
+        
         ax[0,0].grid(True)
         ax[0,0].set_xlabel('Ro')
         ax[0,0].set_ylabel('R*')
