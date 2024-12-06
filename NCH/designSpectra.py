@@ -359,16 +359,17 @@ class NCh433:
         ax.set_ylabel('Spectral Acceleration (Sa)')
         plt.show()
 
-# Example usage:
-try:
-    n = NCh433('Zona 1', 'Tipo II', 'B')
-    print(n)
-    n.printLog()
-    R_results=n.calcular_R_mod(Tx=1.0, Ty=1.5)
-    n.plot_R_mod(R_results)
-    n.plot_R_mod_3D(R_results)
-    direccion_X = {'T': np.linspace(0, 4, 100), 'Ro': np.random.uniform(1, 3, 100)}
-    direccion_Y = {'T': np.linspace(0, 4, 100), 'Ro': np.random.uniform(1, 3, 100)}
-    n.plot_spectral_acceleration(marker='o')
-except ValueError as e:
-    print(e)
+if __name__ == "__main__":
+    # Example usage:
+    try:
+        n = NCh433('Zona 1', 'Tipo II', 'B')
+        print(n)
+        n.printLog()
+        R_results=n.calcular_R_mod(Tx=1.0, Ty=1.5)
+        n.plot_R_mod(R_results)
+        n.plot_R_mod_3D(R_results)
+        direccion_X = {'T': np.linspace(0, 4, 100), 'Ro': np.random.uniform(1, 3, 100)}
+        direccion_Y = {'T': np.linspace(0, 4, 100), 'Ro': np.random.uniform(1, 3, 100)}
+        n.plot_spectral_acceleration(marker='o')
+    except ValueError as e:
+        print(e)
