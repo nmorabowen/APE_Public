@@ -309,7 +309,7 @@ class NCh433:
             Ry_mod_given=np.array([np.min(Ro_array), Ry_mod, Ry_mod])
             ax[1,0].plot(Ry_given,Ry_mod_given, color='red', linestyle='--', linewidth=1.0)
             ax[1,0].annotate(f'Ro* = {np.round(Ry_mod,2)}', 
-                        (np.min(Ro_array)+0.3,Ro_min+0.2), 
+                        (np.min(Ro_array)+0.3,Ry_mod+0.2), 
                         ha='left',
                         rotation=0)
         
