@@ -266,18 +266,8 @@ class NCh433:
             Rx_given=np.array([Rx, Rx, np.min(Ro_array)])
             Rx_mod_given=np.array([np.min(Ro_array), Rx_mod, Rx_mod])
             ax[0,0].plot(Rx_given,Rx_mod_given, color='red', linestyle='--', linewidth=1.0)
-            ax[0,0].annotate(f'Ro* = {np.round(Rx,2)}', 
+            ax[0,0].annotate(f'Ro* = {np.round(Rx_mod,2)}', 
                         (Rx-0.4,Ro_min), 
-                        ha='left',
-                        rotation=90)
-            
-        if Ry is not None:
-            # Given point array
-            Ry_given=np.array([Ry, Ry, np.min(Ro_array)])
-            Ry_mod_given=np.array([np.min(Ro_array), Ry_mod, Ry_mod])
-            ax[0,1].plot(Ry_given,Ry_mod_given, color='red', linestyle='--', linewidth=1.0)
-            ax[0,1].annotate(f'Ro* = {np.round(Ry,2)}', 
-                        (Ry-0.4,Ro_min), 
                         ha='left',
                         rotation=90)
         
@@ -294,6 +284,7 @@ class NCh433:
                         (Ro_intersection-0.4,np.min(ratio_x)), 
                         ha='left',
                         rotation=90)
+        
         ax[0,1].grid(True)
         ax[0,1].set_xlabel('Ro')
         ax[0,1].set_ylabel('Ratio R*/Ro')
@@ -311,6 +302,17 @@ class NCh433:
                          (Ro_intersection-0.4,Ro_min), 
                          ha='left',
                          rotation=90)
+        
+        if Ry is not None:
+            # Given point array
+            Ry_given=np.array([Ry, Ry, np.min(Ro_array)])
+            Ry_mod_given=np.array([np.min(Ro_array), Ry_mod, Ry_mod])
+            ax[1,0].plot(Ry_given,Ry_mod_given, color='red', linestyle='--', linewidth=1.0)
+            ax[1,0].annotate(f'Ro* = {np.round(Ry_mod,2)}', 
+                        (Ry-0.4,Ro_min), 
+                        ha='left',
+                        rotation=90)
+        
         ax[1,0].grid(True)
         ax[1,0].set_xlabel('Ro')
         ax[1,0].set_ylabel('R*')
