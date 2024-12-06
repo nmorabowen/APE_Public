@@ -267,9 +267,9 @@ class NCh433:
             Rx_mod_given=np.array([np.min(Ro_array), Rx_mod, Rx_mod])
             ax[0,0].plot(Rx_given,Rx_mod_given, color='red', linestyle='--', linewidth=1.0)
             ax[0,0].annotate(f'Ro* = {np.round(Rx_mod,2)}', 
-                        (Rx-0.4,Ro_min), 
+                        (np.min(Ro_array)+0.6,Rx_mod), 
                         ha='left',
-                        rotation=90)
+                        rotation=0)
         
         ax[0,0].grid(True)
         ax[0,0].set_xlabel('Ro')
