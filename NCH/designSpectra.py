@@ -263,8 +263,8 @@ class NCh433:
         
         if Rx is not None:
             # Given point array
-            Rx_given=np.array([Rx, Rx, 0])
-            Rx_mod_given=np.array([0, Rx_mod, Rx_mod])
+            Rx_given=np.array([Rx, Rx, np.min(Ro_array)])
+            Rx_mod_given=np.array([np.min(Ro_array), Rx_mod, Rx_mod])
             ax[0,0].plot(Rx_given,Rx_mod_given, color='red', linestyle='--', linewidth=1.0)
             ax[0,0].annotate(f'Ro* = {np.round(Rx,2)}', 
                         (Rx-0.4,Ro_min), 
@@ -273,8 +273,8 @@ class NCh433:
             
         if Ry is not None:
             # Given point array
-            Ry_given=np.array([Ry, Ry, 0])
-            Ry_mod_given=np.array([0, Ry_mod, Ry_mod])
+            Ry_given=np.array([Ry, Ry, np.min(Ro_array)])
+            Ry_mod_given=np.array([np.min(Ro_array), Ry_mod, Ry_mod])
             ax[0,1].plot(Ry_given,Ry_mod_given, color='red', linestyle='--', linewidth=1.0)
             ax[0,1].annotate(f'Ro* = {np.round(Ry,2)}', 
                         (Ry-0.4,Ro_min), 
