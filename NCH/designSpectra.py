@@ -401,6 +401,36 @@ class NCh433:
         ax.set_xlabel('Period (T)')
         ax.set_ylabel('Spectral Acceleration (Sa)')
         plt.show()
+        
+    def amplification_factor(self, T_array=np.linspace(0,4,50)):
+        def alpha(Tn, To, P):
+            return (1+4.5*(Tn/To)**p)/(1+(Tn/To)**3)
+        
+        codeparams = self.codeParams
+        soil_types = self.codeparams['suelo']
+        alpha_values = {}
+        
+        for soil, params in soil_types.items():
+            To = params['To']
+            p = params['p']
+            alpha_values[soil] = [alpha(Tn, To, p) for Tn in T_array]
+            
+        # Plot the results
+        plt.figure(figsize=(10, 6))
+        for soil, values in alpha_values.items():
+            plt.plot(T_array, values, label=f"Soil Type {soil}")
+        
+        plt.title("Amplification Factor for Different Soil Types (NCh433)", fontsize=14)
+        plt.xlabel("Period (Tn)", fontsize=12)
+        plt.ylabel("Amplification Factor (α)", fontsize=12)
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.legend(title="Soil Types", fontsize=10)
+        plt.show()
+        
+        return alpha_values
+        
+        
+        pass
 
 if __name__ == "__main__":
     # Example usage:
