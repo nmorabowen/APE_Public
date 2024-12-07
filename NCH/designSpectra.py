@@ -435,7 +435,7 @@ class NCh433:
                     bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5))
         
         ax.grid(True)
-        ax.set_xlim(left=0, right=self.Tn)  # Limit x-axis to Tn
+        ax.set_xlim(left=0, right=np.max(T))  # Limit x-axis to Tn
         ax.set_ylim(bottom=0)
         ax.set_xlabel('Period (T)')
         ax.set_ylabel('Spectral Acceleration (Sa)')
