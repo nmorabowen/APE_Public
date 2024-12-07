@@ -31,19 +31,21 @@ class NCh433:
         Soil exponent
     p : float
         Damping correction factor
+    elastic_spectra : dict
+        Precomputed elastic spectral acceleration for the given parameters
     """
 
     def __init__(self, zonaSismica, categoriaDiseño, tipoSuelo):
         """
-        Initializes the NCh433 object with the specified seismic zone, design category, and soil type.
+        Constructs all the necessary attributes for the NCh433 object.
 
         Parameters:
         zonaSismica : str
-            The seismic zone (e.g., 'Zona 1', 'Zona 2', 'Zona 3').
+            The seismic zone (e.g., 'Zona 1', 'Zona 2', 'Zona 3')
         categoriaDiseño : str
-            The design category (e.g., 'Tipo I', 'Tipo II', 'Tipo III', 'Tipo IV').
+            The design category (e.g., 'Tipo I', 'Tipo II', 'Tipo III', 'Tipo IV')
         tipoSuelo : str
-            The type of soil (e.g., 'A', 'B', 'C', 'D', 'E').
+            The type of soil (e.g., 'A', 'B', 'C', 'D', 'E')
         """
         # Load code parameters
         self.codeParams = self._loadDefaultParams()
@@ -62,7 +64,7 @@ class NCh433:
         self.n = self.codeParams['suelo'][self.tipoSuelo]['n']
         self.p = self.codeParams['suelo'][self.tipoSuelo]['p']
         
-        # Calculations
+        # Precompute elastic spectral acceleration
         self.elastic_spectra = self.calculate_elastic_spectral_acceleration()
     
     def __str__(self):
@@ -75,7 +77,7 @@ class NCh433:
     
     def __repr__(self):
         """
-        Returns a string representation of the NCh433 object for debugging.
+        Returns a detailed string representation of the NCh433 object for debugging.
         """
         return self.__str__()
     
@@ -87,6 +89,7 @@ class NCh433:
         dict: A dictionary containing the default parameters for the seismic zone,
               design category, and soil type.
         """
+        # Default parameters for the code
         zona = {
             'Zona 1': {'Ao': 0.20},
             'Zona 2': {'Ao': 0.30},
@@ -99,13 +102,53 @@ class NCh433:
             'Tipo IV': {'I': 1.20},
         }
         suelo = {
-            'A': {'S': 0.90, 'To': 0.15, 'T*': 0.20, 'n': 1.00, 'p': 2.00},
-            'B': {'S': 1.00, 'To': 0.30, 'T*': 0.35, 'n': 1.33, 'p': 1.50},
-            'C': {'S': 1.05, 'To': 0.40, 'T*': 0.45, 'n': 1.40, 'p': 1.60},
-            'D': {'S': 1.20, 'To': 0.75, 'T*': 0.85, 'n': 1.80, 'p': 1.00},
-            'E': {'S': 1.30, 'To': 1.20, 'T*': 1.35, 'n': 1.80, 'p': 1.00},
+            'A': {
+                'Descripcion': 'Roca, suelo cementado',
+                'S': 0.90,
+                'To': 0.15,
+                'T*': 0.20,
+                'n': 1.00,
+                'p': 2.00
+            },
+            'B': {
+                'Descripcion': 'Roca blanda o fracturada, suelo muy denso o muy firme',
+                'S': 1.00,
+                'To': 0.30,
+                'T*': 0.35,
+                'n': 1.33,
+                'p': 1.50
+            },
+            'C': {
+                'Descripcion': 'Suelo denso o firme',
+                'S': 1.05,
+                'To': 0.40,
+                'T*': 0.45,
+                'n': 1.40,
+                'p': 1.60
+            },
+            'D': {
+                'Descripcion': 'Suelo medianamente denso, o firme',
+                'S': 1.20,
+                'To': 0.75,
+                'T*': 0.85,
+                'n': 1.80,
+                'p': 1.00
+            },
+            'E': {
+                'Descripcion': 'Suelo de compacidad, o consistencia mediana',
+                'S': 1.30,
+                'To': 1.20,
+                'T*': 1.35,
+                'n': 1.80,
+                'p': 1.00
+            }
         }
-        return {'zona': zona, 'categoria': categoria, 'suelo': suelo}
+        codeParams = {
+            'zona': zona,
+            'categoria': categoria,
+            'suelo': suelo
+        }
+        return codeParams
     
     def _validate_input(self, input_value, valid_options, input_name):
         """
@@ -129,41 +172,15 @@ class NCh433:
             raise ValueError(f"Invalid value for {input_name}: {input_value}. Valid options are: {list(valid_options.keys())}")
         return input_value
     
-    def calculate_elastic_spectral_acceleration(self, T_lim=4, num_Tn_array=100):
+    def printLog(self):
         """
-        Calculates the elastic spectral acceleration for the NCh433 code.
-
-        Parameters:
-        T_lim : float
-            Maximum period for the spectrum (default is 4 seconds).
-        num_Tn_array : int
-            Number of discrete points for the period array (default is 100).
-
-        Returns:
-        dict: A dictionary containing periods ('T') and spectral accelerations ('Sa').
+        Prints a detailed log of the NCh433 object attributes.
         """
-        Tn_array = np.linspace(0, T_lim, num_Tn_array)
-        
-        def alpha_function(Tn, To, p):
-            return (1 + 4.50 * (Tn / To)**p) / (1 + (Tn / To)**3)
-
-        def Sa_function(S, Ao, alpha, I):
-            return S * Ao * alpha * I
-
-        alpha_array = alpha_function(Tn_array, self.To, self.p)
-        Sa = Sa_function(self.S, self.Ao, alpha_array, self.I)
-        return {'Sa': Sa, 'T': Tn_array}
-    
-    def plot_spectral_acceleration(self):
-        """
-        Plots the elastic spectral acceleration.
-        """
-        T = self.elastic_spectra['T']
-        Sa = self.elastic_spectra['Sa']
-        plt.figure(figsize=(10, 6))
-        plt.plot(T, Sa, color=blueAPE, linewidth=2)
-        plt.title("Elastic Spectral Acceleration", fontsize=14)
-        plt.xlabel("Period (T)", fontsize=12)
-        plt.ylabel("Spectral Acceleration (Sa)", fontsize=12)
-        plt.grid(True, linestyle='--', alpha=0.7)
-        plt.show()
+        print(f'La zona sísmica es {self.zonaSismica} donde Ao = {self.Ao:.2f}')
+        print(f'La categoría de diseño es {self.categoriaDiseño} donde I = {self.I:.2f}')
+        print(f'El tipo de suelo es {self.tipoSuelo} correspondiente a: {self.codeParams["suelo"][self.tipoSuelo]["Descripcion"]}')
+        print(f'El coeficiente S es {self.S:.2f}')
+        print(f'El coeficiente To es {self.To:.2f}')
+        print(f'El coeficiente T* es {self.T_star:.2f}')
+        print(f'El coeficiente n es {self.n:.2f}')
+        print(f'El coeficiente p es {self.p:.2f}')
