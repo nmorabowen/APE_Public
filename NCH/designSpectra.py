@@ -407,7 +407,7 @@ class NCh433:
             return (1+4.5*(Tn/To)**p)/(1+(Tn/To)**3)
         
         codeparams = self.codeParams
-        soil_types = self.codeparams['suelo']
+        soil_types = self.codeParams['suelo']
         alpha_values = {}
         
         for soil, params in soil_types.items():
