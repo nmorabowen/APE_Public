@@ -409,10 +409,13 @@ class NCh433:
         
         Sa_lim = self.I * self.S * self.Ao / 6
         
+        # Find intersection
+        interp_funct=interp1d(Sa_reduced, T, kind='linear', fill_value='extrapolate')
+        Ro_intersection=interp_funct(Sa_lim)
+        
         # Find intersection point
-        intersection_index = np.argmin(np.abs(Sa_reduced - Sa_lim))
-        intersection_T = T[intersection_index]
-        intersection_Sa = Sa_reduced[intersection_index]
+        intersection_T = Ro_intersection
+        intersection_Sa = Sa_lim
         
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 5))
