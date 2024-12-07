@@ -402,6 +402,29 @@ class NCh433:
         ax.set_ylabel('Spectral Acceleration (Sa)')
         plt.show()
         
+    def plot_inelastic_spectral_acceleration(self, R_mod, ax=None, marker=None):
+
+        T=self.elastic_spectra['T']
+        Sa=self.elastic_spectra['Sa']
+        Sa_reduced=self.elastic_spectra['Sa']/R_mod
+        
+        Sa_lim=self.I*self.S*self.Ao/6
+        
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(10,5))
+
+        ax.plot(T, Sa, color=blueAPE, linewidth=1.5, marker=marker)
+        ax.plot(T, Sa_reduced, color='k', linewidth=1.5, marker=marker)
+        
+        ax.axhline(y=Sa_lim, color='r', linestyle='--', linewidth=1.5, label='Sa Limit')
+        
+        ax.grid(True)
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.set_xlabel('Period (T)')
+        ax.set_ylabel('Spectral Acceleration (Sa)')
+        plt.show()
+        
     def amplification_factor(self, T_array=np.linspace(0,4,200)):
         def alpha(Tn, To, P):
             return (1+4.5*(Tn/To)**p)/(1+(Tn/To)**3)
@@ -428,6 +451,7 @@ class NCh433:
         plt.show()
         
         return alpha_values
+    
         
     def force_reduction_factor(self, Ro, T_array=np.linspace(0,4,200), Tx=None, Ty=None):
         def R_mod_calculation(T, To, Ro):
