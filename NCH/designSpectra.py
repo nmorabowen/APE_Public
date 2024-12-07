@@ -403,26 +403,45 @@ class NCh433:
         plt.show()
         
     def plot_inelastic_spectral_acceleration(self, R_mod, ax=None, marker=None):
-
-        T=self.elastic_spectra['T']
-        Sa=self.elastic_spectra['Sa']
-        Sa_reduced=self.elastic_spectra['Sa']/R_mod
+        T = self.elastic_spectra['T']
+        Sa = self.elastic_spectra['Sa']
+        Sa_reduced = self.elastic_spectra['Sa'] / R_mod
         
-        Sa_lim=self.I*self.S*self.Ao/6
+        Sa_lim = self.I * self.S * self.Ao / 6
+        
+        # Find intersection point
+        intersection_index = np.argmin(np.abs(Sa_reduced - Sa_lim))
+        intersection_T = T[intersection_index]
+        intersection_Sa = Sa_reduced[intersection_index]
         
         if ax is None:
-            fig, ax = plt.subplots(figsize=(10,5))
+            fig, ax = plt.subplots(figsize=(10, 5))
 
-        ax.plot(T, Sa, color=blueAPE, linewidth=1.5, marker=marker)
-        ax.plot(T, Sa_reduced, color='k', linewidth=1.5, marker=marker)
+        ax.plot(T, Sa, color=blueAPE, linewidth=1.5, marker=marker, label='Elastic Spectrum')
+        ax.plot(T, Sa_reduced, color='k', linewidth=1.5, marker=marker, label='Reduced Spectrum')
         
+        # Horizontal line for Sa_lim
         ax.axhline(y=Sa_lim, color='r', linestyle='--', linewidth=1.5, label='Sa Limit')
         
+        # Plot intersection point
+        ax.plot(intersection_T, intersection_Sa, 'ro', markersize=8)
+        
+        # Add text annotation for intersection point
+        ax.annotate(f'({intersection_T:.3f}, {intersection_Sa:.3f})', 
+                    xy=(intersection_T, intersection_Sa), 
+                    xytext=(10, 10),
+                    textcoords='offset points',
+                    fontsize=9,
+                    bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5))
+        
         ax.grid(True)
-        ax.set_xlim(left=0)
+        ax.set_xlim(left=0, right=self.Tn)  # Limit x-axis to Tn
         ax.set_ylim(bottom=0)
         ax.set_xlabel('Period (T)')
         ax.set_ylabel('Spectral Acceleration (Sa)')
+        
+        ax.legend()
+        
         plt.show()
         
     def amplification_factor(self, T_array=np.linspace(0,4,200)):
