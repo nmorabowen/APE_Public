@@ -445,7 +445,7 @@ class NCh433:
         for soil, values in R_mod.items():
             plt.plot(T_array, values, label=f"R* for Ro={Ro} {soil}")
         
-        plt.title("Force Reduction Factor R* for Soil Types and Ro={Ro} (NCh433)", fontsize=12)
+        plt.title(f"Force Reduction Factor R* for Soil Types and Ro={Ro} (NCh433)", fontsize=12)
         plt.xlabel("Period (T*)", fontsize=10)
         plt.ylabel("R*", fontsize=10)
         plt.grid(True, linestyle='--', alpha=0.7)
