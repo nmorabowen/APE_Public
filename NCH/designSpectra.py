@@ -429,7 +429,7 @@ class NCh433:
         
         return alpha_values
         
-    def force_reduction_factor(self, Ro, T_array=np.linspace(0,4,200)):
+    def force_reduction_factor(self, Ro, T_array=np.linspace(0,4,200), Tx=None, Ty=None):
         def R_mod_calculation(T, To, Ro):
             return 1+(T)/(0.10*To+T/Ro)
         
@@ -444,7 +444,12 @@ class NCh433:
         plt.figure(figsize=(10, 6))
         for soil, values in R_mod.items():
             plt.plot(T_array, values, label=f"R* for Ro={Ro} {soil}")
-        
+    
+        if Tx is not None:
+            plt.axvline(Tx, color='red', linestyle='--', label=f"Tx={Tx}")
+        if Ty is not None:
+            plt.axvline(Ty, color='blue', linestyle='--', label=f"Ty={Ty}")
+    
         plt.title(f"Force Reduction Factor R* for Soil Types and Ro={Ro} (NCh433)", fontsize=12)
         plt.xlabel("Period (T*)", fontsize=10)
         plt.ylabel("R*", fontsize=10)
