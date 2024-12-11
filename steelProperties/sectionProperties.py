@@ -112,7 +112,7 @@ class WSection:
         Zy=self.x_cm*self.Ag
         return Zx, Zy
 
-    def calculate_expected_moment_capacity(self):
+    def calculate_expected_moment_capacity(self, verbose=False):
         """
         Calculates the expected moment capacity (Mpr) of the section.
 
@@ -124,6 +124,10 @@ class WSection:
         Fy = self.material.Fy
         Ry = self.material.Ry
         Mpr = Ry * Fy * Zx
+        
+        if verbose is True:
+            print(f'Beam expected moment capacity is: {np.round(Mpr,1)}')
+        
         return Mpr
 
     def calculate_nominal_moment_capacity(self, Pu):
