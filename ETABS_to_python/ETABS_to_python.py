@@ -5,10 +5,11 @@ import comtypes.client
 import ctypes
 
 class ETABS_APE:
-    def __init__(self, filePath=None) -> None:
+    def __init__(self, filePath=None, processID=None) -> None:
         
         # Call method to connect to the model instance and return the object
         self.filePath=filePath
+        self.processID=processID
         self.SapModel=self.connect_to_etabs()
         
         # Connect with helper classes
@@ -17,18 +18,27 @@ class ETABS_APE:
 
 
     def connect_to_etabs(self):
+        """Connect to a running ETABS instance, either active or specified by processID."""
         
-        etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
-        
-        filePath=self.filePath
-        
-        if filePath is None:
-            """Connect to active ETABS instance and return the modelo object"""
+        try:
+            if self.processID is not None:
+                # Attach to a specific ETABS instance using process ID
+                etabs = comtypes.client.GetObjectProcess("CSI.ETABS.API.ETABSObject", self.processID)
+            else:
+                # Attach to the active ETABS instance
+                etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
+            
             SapModel = etabs.SapModel
+            
+            # If filePath is provided, open the model
+            if self.filePath:
+                SapModel.File.OpenFile(self.filePath)
+                
             return SapModel
-        else:
-            SapModel=etabs.SapModel
-            SapModel.File.OpenFile(filePath)
+        
+        except Exception as e:
+            print(f"Error connecting to ETABS: {e}")
+            return None
         
     
     def _create_units_dictionaries(self):
