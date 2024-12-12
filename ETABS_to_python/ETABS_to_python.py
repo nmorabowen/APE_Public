@@ -4,6 +4,9 @@ import pandas as pd
 import comtypes.client
 import ctypes
 import psutil
+import os
+import sys
+
 
 class ETABS_APE:
     def __init__(self, filePath=None, processID=None) -> None:
@@ -38,10 +41,8 @@ class ETABS_APE:
         # (like starting the application, attaching to an existing instance, etc.).
         helper=helper.QueryInterface(comtypes.gen.ETABSv1.cHelper)
 
-        
         try:
             if self.processID is not None:
-                
                 # Check if the process exists
                 if not self._process_exists(self.processID):
                     list_etabs_instances()
@@ -52,22 +53,35 @@ class ETABS_APE:
                 # GetObject provides access to the entire ETABS aplication
                 etabs = helper.GetObjectProcess("CSI.ETABS.API.ETABSObject", self.processID)
             else:
-                # Attach to the active ETABS instance
-                print("Connecting to the active ETABS instance...")
-                # The GetActiveObject method is used to attach to a running instance of ETABS, but the object returned is typically a reference to the ETABS application object (ETABSObject).
-                etabs = helper.GetObject("CSI.ETABS.API.ETABSObject")
-            
+                try:
+                    # Attach to the active ETABS instance
+                    print("Connecting to the active ETABS instance...")
+                    # The GetActiveObject method is used to attach to a running instance of ETABS, but the object returned is typically a reference to the ETABS application object (ETABSObject).
+                    etabs = helper.GetObject("CSI.ETABS.API.ETABSObject")
+                except (OSError, comtypes.COMError):
+                    print("No running instance of the program found or failed to attach.")
+                    sys.exit(-1)
+        
+            # If filePath is provided, open the model
+            if self.filePath:
+                try:
+                    print(f"Opening ETABS model from {self.filePath}...")
+                    etabs=helper.CreateObject(self.filePath)
+                except (OSError, comtypes.COMError):
+                    print("Cannot start a new instance of the program from " + self.filePath)
+                    sys.exit(-1)
+                    
+                etabs.ApplicationStart()
+                    
+            # Create SapModel object
+            # The SapModel object in the ETABS API is the core object used to interact with the structural model within ETABS. It provides methods and properties to define, manipulate, and analyze the model, including creating and modifying structural elements (e.g., beams, columns, walls), defining materials and cross-sectional properties, applying loads, running analysis, and retrieving results.
             SapModel = etabs.SapModel
             
+        
             # Ensure SapModel is valid before returning
             if not SapModel:
                 print("Error: SapModel is None. Unable to connect.")
                 return None
-            
-            # If filePath is provided, open the model
-            if self.filePath:
-                print(f"Opening ETABS model from {self.filePath}...")
-                SapModel.File.OpenFile(self.filePath)
                 
             return SapModel
         
