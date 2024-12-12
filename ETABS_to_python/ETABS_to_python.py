@@ -3,14 +3,22 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import comtypes.client
 import ctypes
-
+import psutil
 
 class ETABS_APE:
     def __init__(self, filePath=None, processID=None) -> None:
         
+        # Set globar reference variables
+        self._programPath=r'C:\Program Files\Computers and Structures\ETABS 22\ETABS.exe'
+        
         """Initialize ETABS instance and connect to the model."""
         self.filePath = filePath
         self.processID = processID
+        
+        # Error checking regarding process ID and filepath, only one can be provided
+        if filePath is filePath is not None and processID is not None:
+            raise ValueError(f'Set either processID of filePath, not both')
+        
         self.SapModel = self.connect_to_etabs()
 
         if self.SapModel:
@@ -23,6 +31,11 @@ class ETABS_APE:
     def connect_to_etabs(self):
         """Connect to a running ETABS instance, either active or specified by processID."""
         
+        # Create COM helper object
+        helper = comtypes.client.CreateObject('ETABSv1.Helper')
+        # Add functionality to the object
+        helper=helper.QueryInterface(comtypes.gen.ETABSv1.cHelper)
+        
         try:
             if self.processID is not None:
                 
@@ -33,7 +46,6 @@ class ETABS_APE:
                 
                 print(f"Connecting to ETABS instance with process ID: {self.processID}")
                 # Attach to a specific ETABS instance using process ID
-                helper = comtypes.client.CreateObject('ETABSv1.Helper')
                 etabs = helper.GetObjectProcess("CSI.ETABS.API.ETABSObject", self.processID)
             else:
                 # Attach to the active ETABS instance
@@ -369,17 +381,30 @@ class drift:
     
 def list_etabs_instances():
     
-    helper = comtypes.client.CreateObject('ETABSv1.Helper')
+    etabs_processes = []
 
-    # Create a new instance
-    helper.CreateObject("CSI.ETABS.API.ETABSObject")
+    # Iterate over all running processes
+    for process in psutil.process_iter(['pid', 'name', 'exe']):
+        try:
+            # Check if the process name contains 'ETABS' (adjust for your ETABS version if needed)
+            if 'ETABS' in process.info['name']:
+                etabs_processes.append({
+                    'pid': process.info['pid'],
+                    'name': process.info['name'],
+                    'exe': process.info['exe']
+                })
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # Ignore processes we cannot access or are no longer running
+            continue
+        
+    if etabs_processes:
+        print("Running ETABS Instances:")
+        for instance in etabs_processes:
+            print(f"Process ID: {instance['pid']}, Process Name: {instance['name']}, Executable Path: {instance['exe']}")
+    else:
+        print("No ETABS instances are currently running.")
 
-    # Get number of running instances
-    num_instances = helper.GetNumRunningETABSInstances()
+    return etabs_processes
 
-    # Get process IDs of all running instances
-    for i in range(num_instances):
-        pid = helper.GetRunningETABSProcessID(i+1)
-        print(f"ETABS Instance {i+1} Process ID: {pid}")
-
+list_etabs_instances()
 
