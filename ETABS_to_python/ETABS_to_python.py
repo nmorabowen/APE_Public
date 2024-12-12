@@ -7,6 +7,7 @@ import psutil
 
 class ETABS_APE:
     def __init__(self, filePath=None, processID=None) -> None:
+        
         """Initialize ETABS instance and connect to the model."""
         self.filePath = filePath
         self.processID = processID
@@ -37,7 +38,8 @@ class ETABS_APE:
             else:
                 # Attach to the active ETABS instance
                 print("Connecting to the active ETABS instance...")
-                etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
+                helper = comtypes.client.GetObject('ETABSv1.Helper')
+                etabs = helper.GetActiveObject("CSI.ETABS.API.ETABSObject")
             
             SapModel = etabs.SapModel
             
