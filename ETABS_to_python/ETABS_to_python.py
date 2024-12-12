@@ -5,27 +5,28 @@ import comtypes.client
 import ctypes
 
 class ETABS_APE:
-    def __init__(self) -> None:
+    def __init__(self, filePath=None) -> None:
         
         # Call method to connect to the model instance and return the object
         self.SapModel=self.connect_to_etabs()
+        self.filePath=filePath
         
         # Connect with helper classes
         self.tables=ETABS_APE_TABLES(self.SapModel)
         self.nodes=ETABS_APE_NODES(self.SapModel)
 
 
-    def connect_to_etabs(self, filePath=None):
+    def connect_to_etabs(self):
         
         etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
         
-        if filePath is None:
+        if self.filePath is None:
             """Connect to active ETABS instance and return the modelo object"""
             SapModel = etabs.SapModel
             return SapModel
         else:
             SapModel=etabs.SapModel
-            SapModel.File.OpenFile(filePath)
+            SapModel.File.OpenFile(self.filePath)
         
     
     def _create_units_dictionaries(self):
