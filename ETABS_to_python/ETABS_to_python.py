@@ -28,6 +28,7 @@ class ETABS_APE:
                 # Check if the process exists
                 if not self._process_exists(self.processID):
                     raise ValueError(f'No process found with process ID: {self.processID}')
+                    list_etabs_instances()
                 
                 print(f"Connecting to ETABS instance with process ID: {self.processID}")
                 # Attach to a specific ETABS instance using process ID
