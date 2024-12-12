@@ -66,6 +66,22 @@ class ETABS_APE:
         
         return eForce_dict, eLength_dict, eTemperature_dict
 
+    def display_units(self):
+        eForce_dict, eLength_dict, eTemperature_dict = self._create_units_dictionaries
+        
+        # Iterate over each dictionary and display key-value pairs
+        print("Force Units:")
+        for key, value in eForce_dict.items():
+            print(f"{key}: {value}")
+        
+        print("\nLength Units:")
+        for key, value in eLength_dict.items():
+            print(f"{key}: {value}")
+        
+        print("\nTemperature Units:")
+        for key, value in eTemperature_dict.items():
+            print(f"{key}: {value}")
+
     def set_model_units(self, eForce=3, eLength=4, eTemp=2, verbose=True):
         """Method to change the base model units, the default values correspond to N-mm (similar to the baseUnits library)
         To get the ETABS units codes run the _create_unit_dictionary() method
@@ -102,6 +118,8 @@ class ETABS_APE:
         print(f'The force unit is: {eForce_dict[force_code]}')
         print(f'The length unit is: {eLength_dict[length_code]}')
         print(f'The temperature unit is: {eTemperature_dict[temperature_code]}')
+        
+    
         
 class ETABS_APE_NODES:
     
