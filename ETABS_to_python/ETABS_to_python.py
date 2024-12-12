@@ -20,13 +20,15 @@ class ETABS_APE:
         
         etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
         
-        if self.filePath is None:
+        filePath=self.filePath
+        
+        if filePath is None:
             """Connect to active ETABS instance and return the modelo object"""
             SapModel = etabs.SapModel
             return SapModel
         else:
             SapModel=etabs.SapModel
-            SapModel.File.OpenFile(self.filePath)
+            SapModel.File.OpenFile(filePath)
         
     
     def _create_units_dictionaries(self):
