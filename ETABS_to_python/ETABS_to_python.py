@@ -25,7 +25,8 @@ class ETABS_APE:
             if self.processID is not None:
                 print(f"Connecting to ETABS instance with process ID: {self.processID}")
                 # Attach to a specific ETABS instance using process ID
-                etabs = comtypes.client.GetObjectProcess("CSI.ETABS.API.ETABSObject", self.processID)
+                helper = comtypes.client.CreateObject('ETABSv1.Helper')
+                etabs = helper.GetObjectProcess("CSI.ETABS.API.ETABSObject", self.processID)
             else:
                 # Attach to the active ETABS instance
                 print("Connecting to the active ETABS instance...")
