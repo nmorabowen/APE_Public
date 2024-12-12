@@ -51,47 +51,6 @@ class ETABS_APE:
             print(f"Error connecting to ETABS: {e}")
             return None
         
-    @staticmethod
-    def list_active_process():
-        def list_etabs_instances():
-            etabs_processes = []
-
-            # Iterate over all running processes
-            for process in psutil.process_iter(['pid', 'name', 'exe']):
-                try:
-                    # Check if the process name contains 'ETABS' (adjust for your ETABS version if needed)
-                    if 'ETABS' in process.info['name']:
-                        etabs_processes.append({
-                            'pid': process.info['pid'],
-                            'name': process.info['name'],
-                            'exe': process.info['exe']
-                        })
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    # Ignore processes we cannot access or are no longer running
-                    continue
-
-            return etabs_processes
-
-        # List all running ETABS instances
-        etabs_instances = list_etabs_instances()
-
-        # Print out the process IDs, names, and executable paths of the ETABS instances
-        if etabs_instances:
-            print("Running ETABS Instances:")
-            for instance in etabs_instances:
-                print(f"Process ID: {instance['pid']}, Process Name: {instance['name']}, Executable Path: {instance['exe']}")
-        else:
-            print("No ETABS instances are currently running.")
-
-        # Print out the process IDs, names, and executable paths of the ETABS instances
-        if etabs_instances:
-            print("Running ETABS Instances:")
-            for instance in etabs_instances:
-                print(f"Process ID: {instance['pid']}, Process Name: {instance['name']}, Executable Path: {instance['exe']}")
-        else:
-            print("No ETABS instances are currently running.")
-
-    
     def _create_units_dictionaries(self):
         """
         Helper method to create dictionaries that map unit codes to their respective names.
@@ -384,4 +343,33 @@ class drift:
         plt.show()
         
         return filter_df
+    
+    
+def list_etabs_instances():
+    etabs_processes = []
+
+    # Iterate over all running processes
+    for process in psutil.process_iter(['pid', 'name', 'exe']):
+        try:
+            # Check if the process name contains 'ETABS' (adjust for your ETABS version if needed)
+            if 'ETABS' in process.info['name']:
+                etabs_processes.append({
+                    'pid': process.info['pid'],
+                    'name': process.info['name'],
+                    'exe': process.info['exe']
+                })
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # Ignore processes we cannot access or are no longer running
+            continue
+        
+    if etabs_processes:
+        print("Running ETABS Instances:")
+        for instance in etabs_processes:
+            print(f"Process ID: {instance['pid']}, Process Name: {instance['name']}, Executable Path: {instance['exe']}")
+    else:
+        print("No ETABS instances are currently running.")
+
+    return etabs_processes
+
+list_etabs_instances()
 
