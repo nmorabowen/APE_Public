@@ -6,32 +6,41 @@ import ctypes
 
 class ETABS_APE:
     def __init__(self, filePath=None, processID=None) -> None:
-        
-        # Call method to connect to the model instance and return the object
-        self.filePath=filePath
-        self.processID=processID
-        self.SapModel=self.connect_to_etabs()
-        
-        # Connect with helper classes
-        self.tables=ETABS_APE_TABLES(self.SapModel)
-        self.nodes=ETABS_APE_NODES(self.SapModel)
+        """Initialize ETABS instance and connect to the model."""
+        self.filePath = filePath
+        self.processID = processID
+        self.SapModel = self.connect_to_etabs()
 
+        if self.SapModel:
+            # Connect with helper classes
+            self.tables = ETABS_APE_TABLES(self.SapModel)
+            self.nodes = ETABS_APE_NODES(self.SapModel)
+        else:
+            print("Failed to connect to ETABS model.")
 
     def connect_to_etabs(self):
         """Connect to a running ETABS instance, either active or specified by processID."""
         
         try:
             if self.processID is not None:
+                print(f"Connecting to ETABS instance with process ID: {self.processID}")
                 # Attach to a specific ETABS instance using process ID
                 etabs = comtypes.client.GetObjectProcess("CSI.ETABS.API.ETABSObject", self.processID)
             else:
                 # Attach to the active ETABS instance
+                print("Connecting to the active ETABS instance...")
                 etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
             
             SapModel = etabs.SapModel
             
+            # Ensure SapModel is valid before returning
+            if not SapModel:
+                print("Error: SapModel is None. Unable to connect.")
+                return None
+            
             # If filePath is provided, open the model
             if self.filePath:
+                print(f"Opening ETABS model from {self.filePath}...")
                 SapModel.File.OpenFile(self.filePath)
                 
             return SapModel
