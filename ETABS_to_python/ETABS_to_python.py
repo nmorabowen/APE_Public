@@ -67,7 +67,7 @@ class ETABS_APE:
         return eForce_dict, eLength_dict, eTemperature_dict
 
     def display_units(self):
-        eForce_dict, eLength_dict, eTemperature_dict = self._create_units_dictionaries
+        eForce_dict, eLength_dict, eTemperature_dict = self._create_units_dictionaries()
         
         # Iterate over each dictionary and display key-value pairs
         print("Force Units:")
