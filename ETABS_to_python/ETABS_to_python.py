@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import comtypes.client
 import ctypes
-import psutil
+
 
 class ETABS_APE:
     def __init__(self, filePath=None, processID=None) -> None:
@@ -38,8 +38,7 @@ class ETABS_APE:
             else:
                 # Attach to the active ETABS instance
                 print("Connecting to the active ETABS instance...")
-                helper = comtypes.client.GetObject('ETABSv1.Helper')
-                etabs = helper.GetActiveObject("CSI.ETABS.API.ETABSObject")
+                etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
             
             SapModel = etabs.SapModel
             
@@ -369,30 +368,18 @@ class drift:
     
     
 def list_etabs_instances():
-    etabs_processes = []
+    
+    helper = comtypes.client.CreateObject('ETABSv1.Helper')
 
-    # Iterate over all running processes
-    for process in psutil.process_iter(['pid', 'name', 'exe']):
-        try:
-            # Check if the process name contains 'ETABS' (adjust for your ETABS version if needed)
-            if 'ETABS' in process.info['name']:
-                etabs_processes.append({
-                    'pid': process.info['pid'],
-                    'name': process.info['name'],
-                    'exe': process.info['exe']
-                })
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            # Ignore processes we cannot access or are no longer running
-            continue
-        
-    if etabs_processes:
-        print("Running ETABS Instances:")
-        for instance in etabs_processes:
-            print(f"Process ID: {instance['pid']}, Process Name: {instance['name']}, Executable Path: {instance['exe']}")
-    else:
-        print("No ETABS instances are currently running.")
+    # Create a new instance
+    helper.CreateObject("CSI.ETABS.API.ETABSObject")
 
-    return etabs_processes
+    # Get number of running instances
+    num_instances = helper.GetNumRunningETABSInstances()
 
-list_etabs_instances()
+    # Get process IDs of all running instances
+    for i in range(num_instances):
+        pid = helper.GetRunningETABSProcessID(i+1)
+        print(f"ETABS Instance {i+1} Process ID: {pid}")
+
 
