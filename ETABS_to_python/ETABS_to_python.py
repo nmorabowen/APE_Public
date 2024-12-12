@@ -34,7 +34,10 @@ class ETABS_APE:
         # Create COM helper object
         helper = comtypes.client.CreateObject('ETABSv1.Helper')
         # Add functionality to the object
+        # QueryIntercafe allows access to the cIntreface, allowing control and managment of the ETABS enviroment
+        # (like starting the application, attaching to an existing instance, etc.).
         helper=helper.QueryInterface(comtypes.gen.ETABSv1.cHelper)
+
         
         try:
             if self.processID is not None:
@@ -46,11 +49,13 @@ class ETABS_APE:
                 
                 print(f"Connecting to ETABS instance with process ID: {self.processID}")
                 # Attach to a specific ETABS instance using process ID
+                # GetObject provides access to the entire ETABS aplication
                 etabs = helper.GetObjectProcess("CSI.ETABS.API.ETABSObject", self.processID)
             else:
                 # Attach to the active ETABS instance
                 print("Connecting to the active ETABS instance...")
-                etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
+                # The GetActiveObject method is used to attach to a running instance of ETABS, but the object returned is typically a reference to the ETABS application object (ETABSObject).
+                etabs = helper.GetActiveObject("CSI.ETABS.API.ETABSObject")
             
             SapModel = etabs.SapModel
             
