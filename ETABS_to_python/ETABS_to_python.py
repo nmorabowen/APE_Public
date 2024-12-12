@@ -24,6 +24,11 @@ class ETABS_APE:
         
         try:
             if self.processID is not None:
+                
+                # Check if the process exists
+                if not self._process_exists(self.processID):
+                    raise ValueError(f'No process found with process ID: {self.processID}')
+                
                 print(f"Connecting to ETABS instance with process ID: {self.processID}")
                 # Attach to a specific ETABS instance using process ID
                 helper = comtypes.client.CreateObject('ETABSv1.Helper')
@@ -148,6 +153,21 @@ class ETABS_APE:
         print(f'The force unit is: {eForce_dict[force_code]}')
         print(f'The length unit is: {eLength_dict[length_code]}')
         print(f'The temperature unit is: {eTemperature_dict[temperature_code]}')
+        
+    @staticmethod
+    def _process_exists(pid):
+        """Check if the process with the given PID exists."""
+        try:
+            psutil.Process(pid)
+            return True
+        except psutil.NoSuchProcess:
+            return False
+        except psutil.AccessDenied:
+            print(f"Access denied to process with PID {pid}.")
+            return False
+        except psutil.ZombieProcess:
+            print(f"Process with PID {pid} is a zombie.")
+            return False
         
     
         
