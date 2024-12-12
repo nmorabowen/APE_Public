@@ -55,7 +55,7 @@ class ETABS_APE:
                 # Attach to the active ETABS instance
                 print("Connecting to the active ETABS instance...")
                 # The GetActiveObject method is used to attach to a running instance of ETABS, but the object returned is typically a reference to the ETABS application object (ETABSObject).
-                etabs = helper.GetActiveObject("CSI.ETABS.API.ETABSObject")
+                etabs = helper.GetObject("CSI.ETABS.API.ETABSObject")
             
             SapModel = etabs.SapModel
             
