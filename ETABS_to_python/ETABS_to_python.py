@@ -5,15 +5,30 @@ import comtypes.client
 import ctypes
 
 class ETABS_APE:
-    def __init__(self, filePath=None) -> None:
-        
-        # Call method to connect to the model instance and return the object
-        self.filePath=filePath
-        self.SapModel=self.connect_to_etabs()
-        
-        # Connect with helper classes
-        self.tables=ETABS_APE_TABLES(self.SapModel)
-        self.nodes=ETABS_APE_NODES(self.SapModel)
+    def __init__(self, attach_to_instance=False, etabs_path=None):
+        self.SapModel = self.connect_to_etabs(attach_to_instance, etabs_path)
+        self.tables = ETABS_APE_TABLES(self.SapModel)
+        self.nodes = ETABS_APE_NODES(self.SapModel)
+
+    def connect_to_etabs(self, attach_to_instance=False, etabs_path=None):
+        """Connect to an existing ETABS instance or start a new one."""
+        try:
+            if attach_to_instance:
+                # Attach to the first running instance of ETABS
+                etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
+            else:
+                # Start a new ETABS instance
+                if etabs_path is None:
+                    raise ValueError("ETABS path must be specified when not attaching to an existing instance.")
+                helper = comtypes.client.CreateObject('ETABSv1.Helper')
+                helper = helper.QueryInterface(comtypes.gen.ETABSv1.cHelper)
+                etabs = helper.CreateObjectProgID("CSI.ETABS.API.ETABSObject")
+                etabs.ApplicationStart()
+            sap_model = etabs.SapModel
+            return sap_model
+        except Exception as e:
+            print(f"Error connecting to ETABS: {e}")
+            return None
 
 
     def connect_to_etabs(self):
