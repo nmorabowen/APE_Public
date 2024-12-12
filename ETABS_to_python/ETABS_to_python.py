@@ -6,6 +6,7 @@ import ctypes
 import psutil
 import os
 import sys
+import time
 
 
 class ETABS_APE:
@@ -30,7 +31,7 @@ class ETABS_APE:
             self.nodes = ETABS_APE_NODES(self.SapModel)
         else:
             print("Failed to connect to ETABS model.")
-
+    
     def connect_to_etabs(self):
         """Connect to a running ETABS instance, either active or specified by processID."""
         
@@ -63,15 +64,23 @@ class ETABS_APE:
                     sys.exit(-1)
         
             # If filePath is provided, open the model
+            # NOT WORKING
             if self.filePath:
                 try:
                     print(f"Opening ETABS model from {self.filePath}...")
-                    etabs=helper.CreateObject(self.filePath)
+                    etabs=helper.CreateObject("CSI.ETABS.API.ETABSObject")
+                    #etabs=helper.CreateObject(self._programPath)
+                    etabs.ApplicationStart()
+                    time(5)
+                    etabs.InitializeNewModel()
+                    etabs.SapModel.File.NewBlank()
+                    time(5)
+                    etabs.File.Open(self.filePath)
+                    print(f"Successfully opened model: {self.filePath}")
                 except (OSError, comtypes.COMError):
                     print("Cannot start a new instance of the program from " + self.filePath)
                     sys.exit(-1)
-                    
-                etabs.ApplicationStart()
+         
                     
             # Create SapModel object
             # The SapModel object in the ETABS API is the core object used to interact with the structural model within ETABS. It provides methods and properties to define, manipulate, and analyze the model, including creating and modifying structural elements (e.g., beams, columns, walls), defining materials and cross-sectional properties, applying loads, running analysis, and retrieving results.
@@ -424,6 +433,4 @@ def list_etabs_instances():
         print("No ETABS instances are currently running.")
 
     return etabs_processes
-
-list_etabs_instances()
 
