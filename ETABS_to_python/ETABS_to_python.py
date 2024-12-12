@@ -15,11 +15,18 @@ class ETABS_APE:
         self.nodes=ETABS_APE_NODES(self.SapModel)
 
 
-    def connect_to_etabs(self):
-        """Connect to active ETABS instance and return the modelo object"""
+    def connect_to_etabs(self, filePath=None):
+        
         etabs = comtypes.client.GetActiveObject("CSI.ETABS.API.ETABSObject")
-        SapModel = etabs.SapModel
-        return SapModel
+        
+        if filePath is None:
+            """Connect to active ETABS instance and return the modelo object"""
+            SapModel = etabs.SapModel
+            return SapModel
+        else:
+            SapModel=etabs.SapModel
+            SapModel.File.OpenFile(filePath)
+        
     
     def _create_units_dictionaries(self):
         """
