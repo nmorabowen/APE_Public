@@ -8,8 +8,8 @@ class ETABS_APE:
     def __init__(self, filePath=None) -> None:
         
         # Call method to connect to the model instance and return the object
-        self.SapModel=self.connect_to_etabs()
         self.filePath=filePath
+        self.SapModel=self.connect_to_etabs()
         
         # Connect with helper classes
         self.tables=ETABS_APE_TABLES(self.SapModel)
