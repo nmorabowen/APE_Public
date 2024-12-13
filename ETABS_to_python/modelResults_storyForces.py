@@ -1,12 +1,31 @@
 
 # Class aimed to working and drawing story shear and forces from ETABS models
 
+import numpy as np
+import pandas as pd
+from rapidfuzz import process
+import matplotlib.pyplot as plt
 
-class modelResults_storyForces:
-    def __init__(self, df, elevations, units=None):
-        self.df=df
-        self.color_index=0
-        self.elevations=elevations
+from plotApeConfig import blueAPE, grayConcrete, set_default_plot_params, color_palette
+set_default_plot_params()
+
+from .modelResults_utilities import modelResults_utilities
+
+class modelResults_storyForces(modelResults_utilities):
+    def __init__(self, model, units=None):
+        self.model=model
+        
+        # Internal variable to control color
+        self.color_palette=color_palette[0]
+        
+        # Get the ETABS table
+        story_forces_dict=self.model.tables.get_table_data("Story Forces")
+        self.df=story_forces_dict['dataFrame']
+        
+        # Create stories elevation array
+        self.stories_dict=self.model.tables.get_stories_table()
+        self.stories_array=self.stories_dict['elevations_array']
+        
 
         # Error checking for units
         if units is not None:
@@ -25,15 +44,17 @@ class modelResults_storyForces:
             self.units=selected_units
         
         self._modify_df()
-        self._get_elevations()
+        self._get_elevations_array()
     
     
     def _modify_df(self):
         # This method transform some parts of the dataFrame to make it workable
         df=self.df
-        # Removemos los caracteres de texto N+ y N- del data frame
-        df['Story'] = df['Story'].str.replace('N([+-])', r'\1', regex=True).astype(float)
-
+        story_mapping=self.stories_dict['story_mapping']
+        
+        # Add elevations coordinates to the dataFrame
+        df=self.elevation_mapping(df=df, story_mapping=story_mapping)
+  
         # Convert numeric columns explicitly
         for col in df.columns:
             try:
@@ -42,14 +63,15 @@ class modelResults_storyForces:
                 pass  # Skip columns that cannot be converted
             
         self.df=df
-    
-    def _get_elevations(self):
-        elevations_array=np.repeat(self.elevations,2)[1:-1]/self.units['length']
-        self.elevations_array=np.flip(elevations_array)
-    
+        
     def get_load_cases(self):
-        load_cases=df['OutputCase'].unique()
-        return load_cases
+        load_cases_names=self.get_ouputCase_names(self.df)
+        return load_cases_names
+    
+    def _get_elevations_array(self):
+        # Create a stacked version of the elevations to plot in a step wise fashion
+        elevations_array=np.repeat(self.stories_array,2)[1:-1]/self.units['length']
+        self.elevations_array=np.flip(elevations_array)
     
     def get_forces(self, outputCase):
         # This method outputs the story base shear and forces
@@ -79,7 +101,7 @@ class modelResults_storyForces:
         
         # Determine the StepType parameters
         # For the response spectrum cases the step type values are max/min, for the static cases it is none, we will filter them using the max value
-        if 'Max' in df.loc[df['OutputCase'] == outputCase,'StepType'].values:
+        if 'Max' in dataFrame.loc[dataFrame['OutputCase'] == outputCase,'StepType'].values:
             stepType='Max'
             filterCase &= (dataFrame['StepType'] == stepType)
                  
@@ -106,23 +128,7 @@ class modelResults_storyForces:
         ax.plot(baseShear, stories, color=color, linewidth=linewidth, linestyle=linstyle, label=outputCase)
         ax.plot(-baseShear, stories, color=color, linewidth=linewidth, linestyle=linstyle)
         
-        ax.set_yticks(self.elevations)
-        
-        return ax
-    
-    def _plotStoryForces(self, outputCase, ax=None, linewidth=1, linstyle='-', color=blueAPE):
-        # Method to plot the story forces for a single plot
-        
-        stories=self.elevations_array[0::2]
-        
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(5,5))
-          
-        _, storyForces = self.get_forces(outputCase)
-        ax.plot(storyForces, stories, color=color, linewidth=linewidth, linestyle=linstyle, label=outputCase)
-        ax.plot(-storyForces, stories, color=color, linewidth=linewidth, linestyle=linstyle)
-        
-        ax.set_yticks(self.elevations)
+        ax.set_yticks(self.stories_array)
         
         return ax
     
@@ -146,7 +152,30 @@ class modelResults_storyForces:
         plt.show()
         
         plt.show()
+
+    def _plotStoryForces(self, outputCase, ax=None, linewidth=0.5, linstyle='--', color=blueAPE, marker='.'):
+        # Method to plot the story forces for a single plot
         
+        stories=np.flip(self.stories_array)
+        
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(5,5))
+          
+        _, storyForces = self.get_forces(outputCase)
+        # Add the base value as zero
+        storyForces=np.insert(storyForces, len(storyForces), 0)
+        
+        # Create the vertical bar plot for positive and negative forces
+        ax.barh(stories, storyForces, color=color, height=1, align='center', alpha=0.5)
+        ax.barh(stories, -storyForces, color=color, height=1, align='center', alpha=0.5)
+        
+        ax.plot(storyForces, stories, color=color, linewidth=linewidth, linestyle=linstyle, label=outputCase, marker=marker)
+        ax.plot(-storyForces, stories, color=color, linewidth=linewidth, linestyle=linstyle, marker=marker)
+        
+        ax.set_yticks(self.stories_array)
+        
+        return ax
+
     def plotStoryForces(self, outputCaseList, ax=None):
         
         if ax is None:
