@@ -159,7 +159,7 @@ class ETABS_APE:
         for key, value in eTemperature_dict.items():
             print(f"{key}: {value}")
 
-    def set_model_units(self, eForce=3, eLength=4, eTemp=2, verbose=True):
+    def set_model_units(self, eForce=3, eLength=4, eTemp=2, verbose=False):
         """Method to change the base model units, the default values correspond to N-mm (similar to the baseUnits library)
         To get the ETABS units codes run the _create_unit_dictionary() method
 

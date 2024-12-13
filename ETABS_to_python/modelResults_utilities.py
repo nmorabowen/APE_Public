@@ -32,6 +32,35 @@ class modelResults_utilities:
         df['Elevation'] = df['Story'].map(story_mapping)
         return df
     
+    def elevation_mapping_TopBottom(self, df, story_mapping):
+        """
+        Method to map the elevations in the DataFrame according to the story name and Location.
+        Maps the 'Story' column to elevations based on `story_mapping`, with different handling for 
+        'Top' and 'Bottom' locations. For 'Bottom' locations, uses the elevation of the story below.
+        """
+        # Create a sorted list of stories and their elevations
+        sorted_stories = sorted(story_mapping.items(), key=lambda x: x[1], reverse=True)
+        
+        # Create a dictionary mapping each story to the elevation of the story below it
+        lower_story_mapping = {}
+        for i in range(len(sorted_stories) - 1):
+            current_story = sorted_stories[i][0]
+            next_story = sorted_stories[i + 1][0]
+            lower_story_mapping[current_story] = story_mapping[next_story]
+        
+        # For the lowest story, use its own elevation
+        lowest_story = sorted_stories[-1][0]
+        lower_story_mapping[lowest_story] = story_mapping[lowest_story]
+        
+        # Apply elevation mapping for 'Top' locations
+        df['Elevation'] = df['Story'].map(story_mapping)
+        
+        # Adjust Elevation for 'Bottom' locations using the lower story elevation
+        bottom_mask = df['Location'] == 'Bottom'
+        df.loc[bottom_mask, 'Elevation'] = df.loc[bottom_mask, 'Story'].map(lower_story_mapping)
+        
+        return df
+    
     def get_ouputCase_names(self, df):
         """
         Method to print the unique output case names from the provided DataFrame.
