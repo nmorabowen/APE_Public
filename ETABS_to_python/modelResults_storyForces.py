@@ -116,23 +116,28 @@ class modelResults_storyForces(modelResults_utilities):
         
         return baseShear, storyForce
     
-    def _plotBaseShear(self, outputCase, ax=None, linewidth=1, linstyle='-', color=blueAPE):
+    def _plotBaseShear(self, outputCase, ax=None, linewidth=1, linstyle='-', color=blueAPE, appendString=None):
         # Method to plot the base shear for a single plot
         
         stories=self.elevations_array
+        
+        if appendString is not None:
+            plotLabel=outputCase+'-'+appendString
+        else:
+            plotLabel=outputCase
         
         if ax is None:
             fig, ax = plt.subplots(figsize=(5,5))
           
         baseShear, _ = self.get_forces(outputCase)
-        ax.plot(baseShear, stories, color=color, linewidth=linewidth, linestyle=linstyle, label=outputCase)
+        ax.plot(baseShear, stories, color=color, linewidth=linewidth, linestyle=linstyle, label=plotLabel)
         ax.plot(-baseShear, stories, color=color, linewidth=linewidth, linestyle=linstyle)
         
         ax.set_yticks(self.stories_array)
         
         return ax
     
-    def plotBaseShear(self, outputCaseList, ax=None):
+    def plotBaseShear(self, outputCaseList, ax=None, show=True):
         
         if ax is None:
             fig, ax = plt.subplots(figsize=(5,5))
@@ -141,22 +146,27 @@ class modelResults_storyForces(modelResults_utilities):
             self._plotBaseShear(outputCase=outputCase, ax=ax, color=color_palette[i])
             
         # Add labels, title, grid, and legend
-        ax.set_title("Base Shear vs. Story", fontsize=12)
-        ax.set_xlabel("Base Shear [tf]", fontsize=10)
+        ax.set_title("Story Shears", fontsize=12)
+        ax.set_xlabel("Story Shear", fontsize=10)
         ax.set_ylabel("Story Level", fontsize=10)
         ax.legend()
         ax.grid(True, linestyle="--", alpha=0.7)
 
         # Show the plot
         plt.tight_layout()
-        plt.show()
         
-        plt.show()
+        if show is True:
+            plt.show()
 
-    def _plotStoryForces(self, outputCase, ax=None, linewidth=0.5, linstyle='--', color=blueAPE, marker='.'):
+    def _plotStoryForces(self, outputCase, ax=None, linewidth=0.5, linstyle='--', color=blueAPE, marker='.', appendString=None):
         # Method to plot the story forces for a single plot
         
         stories=np.flip(self.stories_array)
+        
+        if appendString is not None:
+            plotLabel=outputCase+'-'+appendString
+        else:
+            plotLabel=outputCase
         
         if ax is None:
             fig, ax = plt.subplots(figsize=(5,5))
@@ -169,14 +179,14 @@ class modelResults_storyForces(modelResults_utilities):
         ax.barh(stories, storyForces, color=color, height=1, align='center', alpha=0.5)
         ax.barh(stories, -storyForces, color=color, height=1, align='center', alpha=0.5)
         
-        ax.plot(storyForces, stories, color=color, linewidth=linewidth, linestyle=linstyle, label=outputCase, marker=marker)
+        ax.plot(storyForces, stories, color=color, linewidth=linewidth, linestyle=linstyle, label=plotLabel, marker=marker)
         ax.plot(-storyForces, stories, color=color, linewidth=linewidth, linestyle=linstyle, marker=marker)
         
         ax.set_yticks(self.stories_array)
         
         return ax
 
-    def plotStoryForces(self, outputCaseList, ax=None):
+    def plotStoryForces(self, outputCaseList, ax=None, show=True):
         
         if ax is None:
             fig, ax = plt.subplots(figsize=(5,5))
@@ -185,8 +195,8 @@ class modelResults_storyForces(modelResults_utilities):
             self._plotStoryForces(outputCase=outputCase, ax=ax, color=color_palette[i])
             
         # Add labels, title, grid, and legend
-        ax.set_title("Base Shear vs. Story", fontsize=12)
-        ax.set_xlabel("Base Shear [tf]", fontsize=10)
+        ax.set_title("Story Forces", fontsize=12)
+        ax.set_xlabel("Story Force", fontsize=10)
         ax.set_ylabel("Story Level", fontsize=10)
         ax.legend()
         ax.grid(True, linestyle="--", alpha=0.7)
@@ -195,4 +205,84 @@ class modelResults_storyForces(modelResults_utilities):
         plt.tight_layout()
         plt.show()
         
-        plt.show()
+        if show is True:
+            plt.show()
+        
+        
+def plotMultipleModelsBaseShear(dictionary, figsize=(8,5)):
+    """
+    Plot base shear results from multiple models on the same graph.
+    
+    Parameters:
+    -----------
+    dictionary : dict
+        Dictionary containing model information in the format:
+        {
+            'id': {
+                'name': str,         # Name identifier for the model
+                'model': model,      # Model object
+                'outputCase': list   # List of output cases to plot
+            }
+        }
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Plot each model's results
+    for i, (model_id, model_info) in enumerate(dictionary.items()):
+        model_name = model_info['name']
+        model = model_info['model']
+        cases = model_info['outputCase']
+            
+        for j, case in enumerate(cases):
+            model._plotBaseShear(outputCase=case, ax=ax, color=color_palette[i+j], appendString=model_name)
+    
+    # Customize plot appearance
+    ax.set_title("Base Shear Comparison", fontsize=12)
+    ax.set_xlabel("Base Shear", fontsize=10)
+    ax.set_ylabel("Story Level", fontsize=10)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.grid(True, linestyle="--", alpha=0.7)
+    
+    # Adjust layout to prevent legend cutoff
+    plt.tight_layout()
+    
+    return fig, ax
+
+def plotMultipleModelsStoryForces(dictionary, figsize=(8,5)):
+    """
+    Plot base shear results from multiple models on the same graph.
+    
+    Parameters:
+    -----------
+    dictionary : dict
+        Dictionary containing model information in the format:
+        {
+            'id': {
+                'name': str,         # Name identifier for the model
+                'model': model,      # Model object
+                'outputCase': list   # List of output cases to plot
+            }
+        }
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Plot each model's results
+    for i, (model_id, model_info) in enumerate(dictionary.items()):
+        model_name = model_info['name']
+        model = model_info['model']
+        cases = model_info['outputCase']
+            
+        for j, case in enumerate(cases):
+            model._plotStoryForces(outputCase=case, ax=ax, color=color_palette[i+j], appendString=model_name)
+    
+    # Customize plot appearance
+    ax.set_title("Story Forces Comparison", fontsize=12)
+    ax.set_xlabel("Story Force", fontsize=10)
+    ax.set_ylabel("Story Level", fontsize=10)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.grid(True, linestyle="--", alpha=0.7)
+    
+    # Adjust layout to prevent legend cutoff
+    plt.tight_layout()
+    
+    return fig, ax
