@@ -53,7 +53,7 @@ class errorChecks:
         if not isinstance(model_stage, str) or model_stage not in model_stages:
             raise TypeError(f'f"The model stage must be a string, the model stages names are: {model_stages}"')
         
-    def _results_name_error(self, result_name, model_stage):
+    def _element_results_name_error(self, result_name, model_stage):
         """
         Check if the result name is valid for the given model stage.
         Parameters
@@ -76,6 +76,33 @@ class errorChecks:
         self._model_stages_error(model_stage)
         
         results_names=self.get_elements_results_names(model_stage=model_stage)
+        
+        if not isinstance(result_name, str) or result_name not in results_names:
+            raise TypeError(f'f"The result name must be a string, the results names are: {results_names}"')
+        
+    def _nodal_results_name_error(self, result_name, model_stage):
+        """
+        Check if the result name is valid for the given model stage.
+        Parameters
+        ----------
+        result_name : str
+            Name of the result to be checked.
+        model_stage : str
+            Stage of the model where the result is located.
+        Raises
+        ------
+        TypeError
+            If result_name is not a string or if it's not in the available results names for the given model stage.
+        Notes
+        -----
+        This method first validates the model stage, then checks if the result name exists in the available results
+        for that stage. The available results are obtained using get_node_results_names method.
+        """
+        
+        # Model stage check
+        self._model_stages_error(model_stage)
+        
+        results_names=self.get_node_results_names(model_stage=model_stage)
         
         if not isinstance(result_name, str) or result_name not in results_names:
             raise TypeError(f'f"The result name must be a string, the results names are: {results_names}"')

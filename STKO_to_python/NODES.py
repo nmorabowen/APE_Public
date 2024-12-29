@@ -111,5 +111,165 @@ class NODES:
                                     node_list.append(node_id)
                                     coords.append(coordinates[id_to_index[node_id]])
             return {'node list': np.array(node_list), 'coordinates': np.array(coords)}
+            
+    def _get_nodal_results(self, model_stage, node_id, results_name):
+        """
+        Retrieve nodal results (e.g., displacement, velocity) for a specific node.
+
+        Args:
+            model_stage (str): The model stage name.
+            node_id (int): The ID of the node.
+            results_name (str): The name of the results group.
+
+        Returns:
+            np.ndarray: A NumPy array with rows containing step number and result components.
+        """
+        # Validate the results name
+        self._nodal_results_name_error(results_name, model_stage)
+        
+        # Get node location details
+        node_results = self.get_node_id(model_stage, node_id)
+        file_id = node_results[0]['file']
+        node_index = node_results[0]['index']
+        
+        if file_id is None or node_index is None:
+            raise ValueError(f"Node ID {node_id} not found in the dataset.")
+        
+        with h5py.File(self.virtual_data_set, 'r') as h5file:
+            # Construct the base path and validate
+            base_path = r'{model_stage}/RESULTS/ON_NODES/{results_name}'.format(
+                model_stage=model_stage, results_name=results_name
+            )
+
+            nodes_group = h5file.get(base_path)
+            if nodes_group is None:
+                raise ValueError(f"The path '{base_path}' does not exist in the HDF5 file.")
+            
+            # Get all datasets under the DATA group
+            data_group = nodes_group.get("DATA")
+            if data_group is None:
+                raise ValueError(f"The DATA group does not exist under the path '{base_path}'.")
+            
+            all_steps = list(data_group.keys())
+            
+            # Filter steps ending with the specific file_id
+            relevant_steps = np.array([step for step in all_steps if step.endswith(file_id)])
+            
+            if len(relevant_steps) == 0:
+                raise ValueError(f"No data found for Node ID {node_id} in file {file_id}.")
+            
+            # Extract step numbers and sort using np.argsort
+            step_numbers = np.array([int(step.split("_")[1]) for step in relevant_steps])
+            sorted_indices = np.argsort(step_numbers)
+            sorted_steps = relevant_steps[sorted_indices]
+            num_steps = len(sorted_steps)
+            
+            # Determine the number of components from the first dataset
+            first_dataset = data_group[sorted_steps[0]]
+            num_components = first_dataset.shape[1] if len(first_dataset.shape) > 1 else 1
+            
+            # Preallocate NumPy array
+            results_data = np.zeros((num_steps, 1 + num_components))  # 1 column for step + components
+            
+            # Extract data for the node index
+            for i, step_name in enumerate(sorted_steps):
+                step_num = int(step_name.split("_")[1])
+                result_data = data_group[step_name][node_index]
+                results_data[i, 0] = step_num  # First column: step number
+                results_data[i, 1:] = result_data  # Remaining columns: result components
+                
+        return results_data
     
+    def get_nodal_results(self, model_stage, node_ids, results_name):
+        """
+        Get nodal results for a single node ID, list of node IDs, or NumPy array of node IDs.
+        The results are stored in a 3D NumPy array.
+
+        Args:
+            model_stage (str): The model stage name.
+            node_ids (int, list, or np.ndarray): Single node ID, a list, or a NumPy array of node IDs.
+            results_name (str): The name of the result to retrieve.
+
+        Returns:
+            np.ndarray: A 3D NumPy array containing results for all requested nodes.
+        """
+        # Convert single integer to a NumPy array
+        if isinstance(node_ids, int):
+            node_ids = np.array([node_ids])
+        # Convert list to NumPy array
+        elif isinstance(node_ids, list):
+            node_ids = np.array(node_ids)
+        # Validate the input
+        if not isinstance(node_ids, np.ndarray) or node_ids.size == 0:
+            raise ValueError("node_ids must be a non-empty NumPy array, list, or a single integer")
+        
+        # Retrieve results for the first node to determine the shape
+        node_zero = node_ids[0]
+        results_data = self._get_nodal_results(model_stage, node_zero, results_name)
+        matrix_shape = results_data.shape
+
+        # Create a 3D array to store results
+        shape = (len(node_ids),) + matrix_shape
+        results_array = np.zeros(shape)
+        results_array[0, :, :] = results_data
+
+        # Retrieve results for the remaining nodes
+        if len(node_ids) > 1:
+            for i in range(1, len(node_ids)):
+                node_id = node_ids[i]
+                results_data = self._get_nodal_results(model_stage, node_id, results_name)
+                results_array[i, :, :] = results_data
+
+        return results_array
+    
+    def get_node_info(self, model_stage, node_id):
+        """Get node's index, file location, and coordinates."""
+        
+        with h5py.File(self.virtual_data_set, 'r') as h5file:
+            # Get node index and file
+            base_path = f"{model_stage}/RESULTS/ON_NODES/DISPLACEMENT"
+            nodes_group = h5file.get(base_path)
+            
+            node_info = {'node_id': node_id}
+            
+            # Find node location
+            for dset_name in nodes_group.keys():
+                if dset_name.startswith("ID"):
+                    dataset = nodes_group[dset_name]
+                    if node_id in dataset[:]:
+                        node_info['index'] = np.where(dataset[:] == node_id)[0][0]
+                        node_info['file'] = dset_name.replace("ID_", "")
+                        break
+            
+            # Get coordinates
+            coords = self.get_node_coordinates(model_stage, [node_id])
+            if coords and len(coords['coordinates']) > 0:
+                node_info['coordinates'] = coords['coordinates'][0]
+                
+            return node_info
+    
+        
+    def find_node_references(self, node_id):
+        """Find all references to a node ID across the database."""
+        references = {}
+        
+        with h5py.File(self.virtual_data_set, 'r') as h5file:
+            def check_node(name, obj):
+                if isinstance(obj, h5py.Dataset):
+                    try:
+                        if obj.shape[0] > 0:  # Only check non-empty datasets
+                            if node_id in obj[:]:
+                                node_index = np.where(obj[:] == node_id)[0][0]
+                                references[name] = {
+                                    'type': 'Dataset',
+                                    'shape': obj.shape,
+                                    'virtual': obj.is_virtual,
+                                    'index': node_index
+                                }
+                    except Exception as e:
+                        pass  # Skip datasets that can't be checked
+                        
+            h5file.visititems(check_node)
+            
+        return references
     

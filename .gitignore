@@ -20,3 +20,7 @@ STKO_to_python/__pycache__/__init__.cpython-311.pyc
 STKO_to_python/__pycache__/ERRORS.cpython-311.pyc
 STKO_to_python/__pycache__/MCPO_VirtualDataset.cpython-311.pyc
 STKO_to_python/__pycache__/NODES.cpython-311.pyc
+baseUnits/__pycache__/__init__.cpython-310.pyc
+baseUnits/__pycache__/units.cpython-310.pyc
+STKO_to_python/__pycache__/GET_MODEL_INFO.cpython-311.pyc
+STKO_to_python/__pycache__/PLOTTER.cpython-311.pyc

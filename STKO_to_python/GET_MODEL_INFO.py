@@ -63,7 +63,7 @@ class GetModelInfo:
         # Check for model stage errors
         self._model_stages_error(model_stage)
         #Check result name errors
-        self._results_name_error(results_name, model_stage)
+        self._element_results_name_error(results_name, model_stage)
         
         with h5py.File(self.virtual_data_set, 'r') as results:
             ele_types = results.get(self.RESULTS_ON_ELEMENTS_PATH.format(model_stage=model_stage) + f"/{results_name}")
@@ -74,6 +74,32 @@ class GetModelInfo:
             if verbose:
                 print(f'The element types found are: {element_types}')
             return element_types
+        
+    def get_node_results_names(self, model_stage, verbose=False):
+        """
+        Retrieve the names of node results names for a given model stage.
+        
+        Args:
+            model_stage (str): Name of the model stage.
+            verbose (bool, optional): If True, prints the node results names.
+        
+        Returns:
+            list: List of node results names.
+        """
+        
+        #Check for model stage errors
+        self._model_stages_error(model_stage)
+        
+        with h5py.File(self.virtual_data_set, 'r') as results:
+            nodes_groups = results.get(self.RESULTS_ON_NODES_PATH.format(model_stage=model_stage))
+            if nodes_groups is None:
+                raise ValueError("Nodes results group not found in the virtual dataset.")
+            
+            nodes_results = list(nodes_groups.keys())
+            if verbose:
+                print(f'The node results found are: {nodes_results}')
+            
+            return nodes_results
 
     
     
