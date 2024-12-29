@@ -248,28 +248,34 @@ class NODES:
                 
             return node_info
     
+    def get_nodes_by_z_coordinate(self, model_stage, z_value, tolerance=1e-6):
+        """
+        Retrieve all nodes at a specific z-coordinate value within a given tolerance.
         
-    def find_node_references(self, node_id):
-        """Find all references to a node ID across the database."""
-        references = {}
+        Args:
+            model_stage (str): The model stage to query.
+            z_value (float): The target z-coordinate value.
+            tolerance (float, optional): The tolerance for comparing z-coordinates. Defaults to 1e-6.
         
+        Returns:
+            list: A list of node IDs at the specified z-coordinate.
+        """
         with h5py.File(self.virtual_data_set, 'r') as h5file:
-            def check_node(name, obj):
-                if isinstance(obj, h5py.Dataset):
-                    try:
-                        if obj.shape[0] > 0:  # Only check non-empty datasets
-                            if node_id in obj[:]:
-                                node_index = np.where(obj[:] == node_id)[0][0]
-                                references[name] = {
-                                    'type': 'Dataset',
-                                    'shape': obj.shape,
-                                    'virtual': obj.is_virtual,
-                                    'index': node_index
-                                }
-                    except Exception as e:
-                        pass  # Skip datasets that can't be checked
-                        
-            h5file.visititems(check_node)
-            
-        return references
+            # Access the nodes group
+            nodes_group = h5file.get(self.MODEL_NODES_PATH.format(model_stage=model_stage))
+            if nodes_group is None:
+                raise ValueError(f"Nodes group not found for model stage '{model_stage}'.")
+
+            node_ids = []
+            for key in nodes_group.keys():
+                if key.startswith("ID"):
+                    ids = nodes_group[key][...]  # Node IDs
+                    coord_key = key.replace("ID", "COORDINATES")
+                    if coord_key in nodes_group:
+                        coordinates = nodes_group[coord_key][...]  # Node coordinates
+                        # Filter nodes by the z-coordinate
+                        for i, coord in enumerate(coordinates):
+                            if abs(coord[2] - z_value) <= tolerance:  # Compare z-coordinate
+                                node_ids.append(int(ids[i]))
+            return node_ids
     

@@ -147,5 +147,5 @@ class plotter:
         ax.set_ylabel(f'{results_name} ({direction.upper()})')
         ax.legend()
         ax.grid(True)
-
+        
         return ax
