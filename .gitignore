@@ -24,3 +24,8 @@ baseUnits/__pycache__/__init__.cpython-310.pyc
 baseUnits/__pycache__/units.cpython-310.pyc
 STKO_to_python/__pycache__/GET_MODEL_INFO.cpython-311.pyc
 STKO_to_python/__pycache__/PLOTTER.cpython-311.pyc
+apeFunctions/__pycache__/__init__.cpython-311.pyc
+apeFunctions/__pycache__/apeFunctions.cpython-311.pyc
+ConstitutiveRelationships/__pycache__/uniaxialBilinealSteel.cpython-311.pyc
+ConstitutiveRelationships/__pycache__/uniaxialConfinedConcrete.cpython-311.pyc
+STKO_to_python/__pycache__/ON_ELEMENTS.cpython-311.pyc

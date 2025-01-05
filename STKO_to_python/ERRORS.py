@@ -106,3 +106,14 @@ class errorChecks:
         
         if not isinstance(result_name, str) or result_name not in results_names:
             raise TypeError(f'f"The result name must be a string, the results names are: {results_names}"')
+    
+    
+    def _element_type_name_error(self, element_type, model_stage):
+
+            # Model stage check
+            self._model_stages_error(model_stage)
+            
+            element_types=self._get_all_types(model_stage=model_stage)
+            
+            if not isinstance(element_type, str) or element_type not in element_types:
+                raise TypeError(f'The element type must be a string, the element types are: {sorted(list(element_types))}')

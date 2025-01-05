@@ -6,18 +6,24 @@ import yaml
 import matplotlib.pyplot as plt
 
 from .NODES import NODES
+from .ON_ELEMENTS import ON_ELEMENTS
 from .ERRORS import errorChecks
 from .GET_MODEL_INFO import GetModelInfo
 from .PLOTTER import plotter
 
-class MCPO_VirtualDataset(NODES, errorChecks, GetModelInfo, plotter):
+class MCPO_VirtualDataset(NODES, 
+                          ON_ELEMENTS, 
+                          errorChecks, 
+                          GetModelInfo, 
+                          plotter):
     
     # Common path templates
     MODEL_NODES_PATH = "/{model_stage}/MODEL/NODES"
+    MODEL_ELEMENTS_PATH = "/{model_stage}/MODEL/ELEMENTS"
     RESULTS_ON_ELEMENTS_PATH = "/{model_stage}/RESULTS/ON_ELEMENTS"
     RESULTS_ON_NODES_PATH = "/{model_stage}/RESULTS/ON_NODES"
 
-    def __init__(self, results_directory, results_directory_name='results_h5', results_filename='results.h5', file_extension='*.mpco'):
+    def __init__(self, results_directory, recorder_name=None, results_directory_name='results_h5', results_filename='results.h5', file_extension='*.mpco'):
         """
         Initialize the MCPO_VirtualDataset instance.
         
@@ -29,6 +35,7 @@ class MCPO_VirtualDataset(NODES, errorChecks, GetModelInfo, plotter):
         """
         self.results_directory = results_directory
         self.file_extension = file_extension
+        self.recorder_name = recorder_name
         
         # Get the results partitions
         self.results_partitions = self._get_results_partitions()
@@ -69,6 +76,9 @@ class MCPO_VirtualDataset(NODES, errorChecks, GetModelInfo, plotter):
             list: Sorted list of partition file paths.
         """
         results_partitions = sorted(glob.glob(f"{self.results_directory}/{self.file_extension}"))
+        print("Using the following partition files:")
+        for partition in results_partitions:
+            print(f"  - {partition}")
         return results_partitions
     
     def create_virtual_dataset(self):
@@ -80,13 +90,18 @@ class MCPO_VirtualDataset(NODES, errorChecks, GetModelInfo, plotter):
 
         def copy_structure(source_group, target_group, file_name, file_index):
             """
-            Recursively copy groups and datasets from source files into the virtual dataset.
+            Recursively copy groups, datasets, and attributes from source files into the virtual dataset.
             """
             for key in source_group.keys():
                 item = source_group[key]
                 if isinstance(item, h5py.Group):
                     # Recursively handle groups
                     new_group = target_group.require_group(key)
+                    
+                    # Copy attributes
+                    for attr_name, attr_value in item.attrs.items():
+                        new_group.attrs[attr_name] = attr_value
+                    
                     copy_structure(item, new_group, file_name, file_index)
                 elif isinstance(item, h5py.Dataset):
                     # Create a virtual layout for the dataset
@@ -95,7 +110,11 @@ class MCPO_VirtualDataset(NODES, errorChecks, GetModelInfo, plotter):
                         vsource = h5py.VirtualSource(file_name, item.name, shape=item.shape)
                         layout = h5py.VirtualLayout(shape=item.shape, dtype=item.dtype)
                         layout[:] = vsource
-                        target_group.create_virtual_dataset(dataset_name, layout)
+                        virtual_dataset = target_group.create_virtual_dataset(dataset_name, layout)
+                        
+                        # Copy attributes
+                        for attr_name, attr_value in item.attrs.items():
+                            virtual_dataset.attrs[attr_name] = attr_value
 
         # Create the virtual dataset
         with h5py.File(self.virtual_data_set, 'w') as results:

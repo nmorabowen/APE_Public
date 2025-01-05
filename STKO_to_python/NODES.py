@@ -1,8 +1,5 @@
 import h5py
 import numpy as np
-import glob  # Import the glob module
-import os
-import yaml
 import matplotlib.pyplot as plt
 
 
@@ -12,10 +9,28 @@ class NODES:
     This is a mixin class to be used with the MCPO_VirtualDataset to handle the nodes of the dataset. 
     """
     
-    # Common path templates
-    MODEL_NODES_PATH = "/{model_stage}/MODEL/NODES"
-    RESULTS_ON_ELEMENTS_PATH = "/{model_stage}/RESULTS/ON_ELEMENTS"
-    RESULTS_ON_NODES_PATH = "/{model_stage}/RESULTS/ON_NODES"
+
+    
+    def _get_all_nodes_ids(self, model_stage):
+        
+        # Check for model stage errors
+        self._model_stages_error(model_stage)
+        
+        with h5py.File(self.virtual_data_set, 'r') as results:
+            nodes_group = results.get(self.MODEL_NODES_PATH.format(model_stage=model_stage))
+            if nodes_group is None:
+                raise ValueError("Nodes group not found in the virtual dataset.")
+            
+            nodes = []
+            file_ids = []
+            for key in nodes_group.keys():
+                if key.startswith("ID"):
+                    file_id = key.replace("ID_", "")
+                    node_ids = nodes_group[key][...]
+                    nodes.extend(node_ids)
+                    file_ids.extend([file_id] * len(node_ids))
+            
+            return np.array([nodes, file_ids])
     
     def get_node_id(self, model_stage, node_ids):
         """
@@ -63,7 +78,7 @@ class NODES:
                     if dset_name.startswith("ID"):
                         dataset = nodes_group[dset_name]
                         data = dataset[:]  # Read data once
-                        if node_id in data:
+                        if node_id in data[:]:
                             node_info['index'] = np.where(data == node_id)[0][0]
                             node_info['file'] = dset_name.replace("ID_", "")
                             # Get coordinates
@@ -247,35 +262,5 @@ class NODES:
                 node_info['coordinates'] = coords['coordinates'][0]
                 
             return node_info
-    
-    def get_nodes_by_z_coordinate(self, model_stage, z_value, tolerance=1e-6):
-        """
-        Retrieve all nodes at a specific z-coordinate value within a given tolerance.
-        
-        Args:
-            model_stage (str): The model stage to query.
-            z_value (float): The target z-coordinate value.
-            tolerance (float, optional): The tolerance for comparing z-coordinates. Defaults to 1e-6.
-        
-        Returns:
-            list: A list of node IDs at the specified z-coordinate.
-        """
-        with h5py.File(self.virtual_data_set, 'r') as h5file:
-            # Access the nodes group
-            nodes_group = h5file.get(self.MODEL_NODES_PATH.format(model_stage=model_stage))
-            if nodes_group is None:
-                raise ValueError(f"Nodes group not found for model stage '{model_stage}'.")
 
-            node_ids = []
-            for key in nodes_group.keys():
-                if key.startswith("ID"):
-                    ids = nodes_group[key][...]  # Node IDs
-                    coord_key = key.replace("ID", "COORDINATES")
-                    if coord_key in nodes_group:
-                        coordinates = nodes_group[coord_key][...]  # Node coordinates
-                        # Filter nodes by the z-coordinate
-                        for i, coord in enumerate(coordinates):
-                            if abs(coord[2] - z_value) <= tolerance:  # Compare z-coordinate
-                                node_ids.append(int(ids[i]))
-            return node_ids
     
