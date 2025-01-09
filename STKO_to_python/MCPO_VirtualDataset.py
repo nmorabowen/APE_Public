@@ -147,5 +147,39 @@ class MCPO_VirtualDataset(NODES,
         yaml_output = yaml.dump(file_structure, default_flow_style=False)
         print("HDF5 File Structure in YAML Format:")
         print(yaml_output)
+        
+    def create_reduced_hdf5(self, node_ids, element_ids, output_file):
+        """
+        Create a reduced HDF5 file containing only the specified nodes and elements with their attributes.
+
+        Args:
+            node_ids (list): List of node IDs to include in the reduced file.
+            element_ids (list): List of element IDs to include in the reduced file.
+            output_file (str): Path to save the reduced HDF5 file.
+        """
+        with h5py.File(self.virtual_data_set, 'r') as original_file, h5py.File(output_file, 'w') as reduced_file:
+            # Copy relevant nodes
+            for model_stage in self.get_model_stages():
+                nodes_path = self.MODEL_NODES_PATH.format(model_stage=model_stage)
+                if nodes_path in original_file:
+                    node_info = self.get_node_coordinates(model_stage, node_ids)
+                    node_group = reduced_file.require_group(nodes_path)
+                    node_list = node_info['node list']
+                    coords = node_info['coordinates']
+
+                    node_group.create_dataset('node_ids', data=node_list)
+                    node_group.create_dataset('coordinates', data=coords)
+
+                # Copy relevant elements
+                elements_path = self.RESULTS_ON_ELEMENTS_PATH.format(model_stage=model_stage)
+                if elements_path in original_file:
+                    element_group = original_file[elements_path]
+                    reduced_element_group = reduced_file.require_group(elements_path)
+                    for element_id in element_ids:
+                        if f"ID_{element_id}" in element_group:
+                            original_data = element_group[f"ID_{element_id}"]
+                            reduced_element_group.create_dataset(f"ID_{element_id}", data=original_data)
+
+            print(f"Reduced HDF5 file created at {output_file}")
     
 
