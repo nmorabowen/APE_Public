@@ -4,18 +4,21 @@ import glob  # Import the glob module
 import os
 import yaml
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 from .NODES import NODES
 from .ON_ELEMENTS import ON_ELEMENTS
 from .ERRORS import errorChecks
 from .GET_MODEL_INFO import GetModelInfo
 from .PLOTTER import plotter
+from .CDATA import CDATA
 
 class MCPO_VirtualDataset(NODES, 
                           ON_ELEMENTS, 
                           errorChecks, 
                           GetModelInfo, 
-                          plotter):
+                          plotter,
+                          CDATA):
     
     # Common path templates
     MODEL_NODES_PATH = "/{model_stage}/MODEL/NODES"
@@ -80,6 +83,78 @@ class MCPO_VirtualDataset(NODES,
         for partition in results_partitions:
             print(f"  - {partition}")
         return results_partitions
+    
+    def _get_file_list(self, extension: str, verbose=False):
+        """
+        Retrieves and organizes files with the specified extension in the results directory.
+
+        Args:
+            extension (str): The file extension to search for (e.g., 'cdata', 'txt').
+            verbose (bool, optional): If True, prints the found files. Default is False.
+
+        Returns:
+            defaultdict: A dictionary mapping base names to file details including paths and parts.
+
+        Raises:
+            ValueError: If the extension is not provided or is empty.
+            FileNotFoundError: If no files with the specified extension are found.
+            Exception: For other unexpected errors.
+        """
+        # Validate inputs
+        if not extension or not isinstance(extension, str):
+            raise ValueError("Invalid file extension provided. Please provide a non-empty string.")
+        
+        results_directory = getattr(self, 'results_directory', None)
+        if not results_directory or not os.path.isdir(results_directory):
+            raise ValueError("The 'results_directory' attribute is not set or is not a valid directory.")
+        
+        try:
+            # Use glob to find all files with the given extension
+            files = glob.glob(f"{results_directory}/*.{extension}")
+            
+            if not files:
+                raise FileNotFoundError(f"No files with the extension '.{extension}' were found in {results_directory}.")
+            
+            # Dictionary to store mapping: {base_name: [{'file': ..., 'part': ...}, ...]}
+            file_mapping = defaultdict(list)
+            
+            for file in files:
+                # Extract the filename without extension
+                base_name = os.path.basename(file)
+                
+                # Ensure the file has the expected part naming
+                if ".part-" in base_name:
+                    try:
+                        name, part = base_name.split(".part-", 1)
+                        part = int(part.split(".")[0])  # Convert part to integer
+                        # Add to the mapping
+                        file_mapping[name].append({'file': file, 'name': name, 'part': part})
+                    except (ValueError, IndexError):
+                        print(f"Skipping file due to unexpected naming format: {file}")
+            
+            # Sort parts for each base name
+            for key in file_mapping:
+                file_mapping[key].sort(key=lambda x: x['part'])
+            
+            # Print the mapping
+            if verbose:
+                print("\nFound files:")
+                for name, mappings in file_mapping.items():
+                    print(f"\n{name}:")
+                    for mapping in mappings:
+                        print(f"  File: {mapping['file']}, Part: {mapping['part']}")
+            
+            return file_mapping
+
+        except FileNotFoundError as fnf_error:
+            print(f"Error: {fnf_error}")
+            raise
+        except ValueError as ve_error:
+            print(f"Error: {ve_error}")
+            raise
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            raise
     
     def create_virtual_dataset(self):
         """
