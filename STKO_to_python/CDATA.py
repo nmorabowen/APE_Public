@@ -20,7 +20,7 @@ class CDATA:
             None
         """
         
-        file_list=self.get_file_list(extension='cdata', verbose=False)
+        file_list=self._get_file_list(extension='cdata', verbose=False)
         for file in file_list.keys():
             print(f'{file}')
     
