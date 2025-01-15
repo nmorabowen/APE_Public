@@ -1,7 +1,12 @@
 ConstitutiveRelationships
+ETABS_to_python
 ModuleFE
+NCH
+STKO_to_python
 apeFunctions
 baseUnits
+cyclicLoading
 gmshtools
 plotApeConfig
 responseSpectrum
+steelProperties
