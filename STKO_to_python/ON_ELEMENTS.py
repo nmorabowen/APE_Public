@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 class ON_ELEMENTS:
     """This is a mixin class to work with MPCO_VirtualDataset"""
     
-    def _get_all_element_index(self, element_type=None, model_stage=None):
+    def _get_all_element_index(self, element_type=None):
         """
         Fetch information for all elements of a given type in a specific model stage.
         If no element type is provided, fetch information for all element types.
@@ -19,12 +19,11 @@ class ON_ELEMENTS:
         Returns:
             list: A list of dictionaries containing element information.
         """
-        # Validate model stage
-        self._model_stages_error(model_stage)
+        model_stages = self.get_model_stages()
 
         # Get all element types if none specified
         if element_type is None:
-            element_types = self._get_all_types(model_stage=model_stage)
+            element_types = self._get_all_types(model_stage=model_stages[0])
         else:
             element_types = [element_type]
 
@@ -34,7 +33,7 @@ class ON_ELEMENTS:
         with h5py.File(self.virtual_data_set, 'r') as results:
             # Loop through each element type
             for etype in element_types:
-                element_group = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stage, element_type=etype))
+                element_group = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stages[0], element_type=etype))
                 
                 if element_group is None:
                     print(f"Warning: Element type '{etype}' not found in the virtual dataset.")
@@ -43,7 +42,7 @@ class ON_ELEMENTS:
                 # Loop through each element in the group
                 for element in element_group.keys():
                     element_name = element.split('[')[0]
-                    file_name = element.split('_file')[1]
+                    file_name = element.split('file')[1]
 
                     if element_name == etype:
                         dataset = element_group[element]
@@ -63,17 +62,17 @@ class ON_ELEMENTS:
 
 
     
-    def _get_element_index(self, element_type, element_id, model_stage):
+    def _get_element_index(self, element_type, element_id):
         
+        model_stages = self.get_model_stages()
         # Check for errors in element type and model stage
-        self._model_stages_error(model_stage)
-        self._element_type_name_error(element_type, model_stage)
+        self._element_type_name_error(element_type, model_stages[0])
         
         # Get the element index
         with h5py.File(self.virtual_data_set, 'r') as results:
             
             # Get the element group names, ie. ElasticBeam3d, ASDShell, etc
-            element_group = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stage, element_type=element_type))
+            element_group = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stages[0], element_type=element_type))
             
             if element_group is None:
                 raise ValueError(f"Element type '{element_type}' not found in the virtual dataset.")
@@ -232,6 +231,34 @@ class ON_ELEMENTS:
                         
         return results_data
     
+    def get_element_nodes(self, element_id):
+        """
+        Retrieve the node IDs for a specific element.
+
+        Args:
+            element_id (int): Element ID to query.
+
+        Returns:
+            list: A list of node IDs associated with the given element.
+        """
+        with h5py.File(self.virtual_data_set, 'r') as h5file:
+            # Locate the element in the mapping
+            element_mapping = h5file['/Mappings/Elements'][:]
+            element_index = np.where(element_mapping['element_id'] == element_id)[0]
+            if element_index.size == 0:
+                raise ValueError(f"Element ID {element_id} not found.")
+            
+            element_file = element_mapping[element_index[0]]['file_name'].decode()
+
+            # Fetch the connectivity information from the dataset
+            element_group_path = f"/MODEL/ELEMENTS/{element_file}/CONNECTIVITY"
+            connectivity_group = h5file.get(element_group_path)
+            if connectivity_group is None:
+                raise ValueError(f"Connectivity information not found for file {element_file}.")
+
+            # Get the node connectivity for the specific element
+            connectivity_data = connectivity_group[element_id]
+            return connectivity_data.tolist()
 
     
 

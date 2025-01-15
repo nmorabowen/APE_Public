@@ -9,28 +9,45 @@ class NODES:
     This is a mixin class to be used with the MCPO_VirtualDataset to handle the nodes of the dataset. 
     """
     
-
-    
-    def _get_all_nodes_ids(self, model_stage):
+    def _get_all_nodes_ids(self):
+        """
+        Retrieve all node IDs, file names, indices, and coordinates for a given model stage.
         
-        # Check for model stage errors
-        self._model_stages_error(model_stage)
+        Args:
+            model_stage (str): The model stage to query.
+        
+        Returns:
+            np.ndarray: A structured array with node IDs, file names, indices, and individual coordinates (x, y, z).
+        """
+        
+        model_stages= self.get_model_stages()
         
         with h5py.File(self.virtual_data_set, 'r') as results:
-            nodes_group = results.get(self.MODEL_NODES_PATH.format(model_stage=model_stage))
+            nodes_group = results.get(self.MODEL_NODES_PATH.format(model_stage=model_stages[0]))
             if nodes_group is None:
                 raise ValueError("Nodes group not found in the virtual dataset.")
             
             nodes = []
             file_ids = []
+            indices = []
+            xs, ys, zs = [], [], []
             for key in nodes_group.keys():
                 if key.startswith("ID"):
                     file_id = key.replace("ID_", "")
                     node_ids = nodes_group[key][...]
-                    nodes.extend(node_ids)
-                    file_ids.extend([file_id] * len(node_ids))
+                    coord_key = key.replace("ID", "COORDINATES")
+                    if coord_key in nodes_group:
+                        coords = nodes_group[coord_key][...]
+                        nodes.extend(node_ids)
+                        file_ids.extend([file_id] * len(node_ids))
+                        indices.extend(range(len(node_ids)))
+                        xs.extend(coords[:, 0])
+                        ys.extend(coords[:, 1])
+                        zs.extend(coords[:, 2])
             
-            return np.array([nodes, file_ids])
+            return np.array([nodes, file_ids, indices, xs, ys, zs])
+
+
     
     def get_node_id(self, model_stage, node_ids):
         """

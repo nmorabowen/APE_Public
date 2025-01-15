@@ -1,4 +1,5 @@
 import h5py
+import numpy as np
 
 
 class GetModelInfo:
@@ -156,6 +157,129 @@ class GetModelInfo:
                                 node_ids.append(int(ids[i]))
             return node_ids
         
+    def _get_file_list(self, extension: str, verbose=False):
+        """
+        Retrieves and organizes files with the specified extension in the results directory.
+
+        Args:
+            extension (str): The file extension to search for (e.g., 'cdata', 'txt').
+            verbose (bool, optional): If True, prints the found files. Default is False.
+
+        Returns:
+            defaultdict: A dictionary mapping base names to file details including paths and parts.
+
+        Raises:
+            ValueError: If the extension is not provided or is empty.
+            FileNotFoundError: If no files with the specified extension are found.
+            Exception: For other unexpected errors.
+        """
+        # Validate inputs
+        if not extension or not isinstance(extension, str):
+            raise ValueError("Invalid file extension provided. Please provide a non-empty string.")
+        
+        results_directory = getattr(self, 'results_directory', None)
+        if not results_directory or not os.path.isdir(results_directory):
+            raise ValueError("The 'results_directory' attribute is not set or is not a valid directory.")
+        
+        try:
+            # Use glob to find all files with the given extension
+            files = glob.glob(f"{results_directory}/*.{extension}")
+            
+            if not files:
+                raise FileNotFoundError(f"No files with the extension '.{extension}' were found in {results_directory}.")
+            
+            # Dictionary to store mapping: {base_name: [{'file': ..., 'part': ...}, ...]}
+            file_mapping = defaultdict(list)
+            
+            for file in files:
+                # Extract the filename without extension
+                base_name = os.path.basename(file)
+                
+                # Ensure the file has the expected part naming
+                if ".part-" in base_name:
+                    try:
+                        name, part = base_name.split(".part-", 1)
+                        part = int(part.split(".")[0])  # Convert part to integer
+                        # Add to the mapping
+                        file_mapping[name].append({'file': file, 'name': name, 'part': part})
+                    except (ValueError, IndexError):
+                        print(f"Skipping file due to unexpected naming format: {file}")
+            
+            # Sort parts for each base name
+            for key in file_mapping:
+                file_mapping[key].sort(key=lambda x: x['part'])
+            
+            # Print the mapping
+            if verbose:
+                print("\nFound files:")
+                for name, mappings in file_mapping.items():
+                    print(f"\n{name}:")
+                    for mapping in mappings:
+                        print(f"  File: {mapping['file']}, Part: {mapping['part']}")
+            
+            return file_mapping
+
+        except FileNotFoundError as fnf_error:
+            print(f"Error: {fnf_error}")
+            raise
+        except ValueError as ve_error:
+            print(f"Error: {ve_error}")
+            raise
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            raise
+        
+    def find_elements_crossing_plane(self, plane_point, plane_normal):
+        """
+        Find all elements that cross a given plane.
+
+        Args:
+            plane_point (list or np.ndarray): A point [x, y, z] on the plane.
+            plane_normal (list or np.ndarray): The normal vector [nx, ny, nz] of the plane.
+
+        Returns:
+            list: A list of element IDs that cross the plane.
+        """
+        # Validate and normalize inputs
+        plane_point = np.array(plane_point, dtype=float)
+        plane_normal = np.array(plane_normal, dtype=float)
+        if plane_point.shape != (3,) or plane_normal.shape != (3,):
+            raise ValueError("plane_point and plane_normal must be 3D vectors.")
+        plane_normal /= np.linalg.norm(plane_normal)  # Normalize the plane normal
+
+        crossing_elements = []
+
+        with h5py.File(self.virtual_data_set, 'r') as h5file:
+            # Load mappings
+            nodes_mapping = h5file['/Mappings/Nodes'][:]
+            element_mapping = h5file['/Mappings/Elements'][:]
+
+            # Extract node coordinates for efficient access
+            node_id_to_coords = {node['node_id']: (node['x'], node['y'], node['z']) for node in nodes_mapping}
+
+            # Iterate over elements
+            for element in element_mapping:
+                element_id = element['element_id']
+                node_list = element['node_list']
+                # Filter out padding (-1)
+                node_list = node_list[node_list != -1]
+
+                # Get coordinates for nodes in the element
+                try:
+                    node_coords = np.array([node_id_to_coords[node_id] for node_id in node_list])
+                except KeyError as e:
+                    print(f"Warning: Node ID {e} not found in mappings. Skipping element {element_id}.")
+                    continue
+
+                # Compute signed distances to the plane
+                signed_distances = np.dot(node_coords - plane_point, plane_normal)
+
+                # Check if nodes exist on both sides of the plane
+                if np.any(signed_distances < 0) and np.any(signed_distances > 0):
+                    crossing_elements.append(element_id)
+
+        return crossing_elements
+            
 
                     
 
