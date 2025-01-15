@@ -8,7 +8,7 @@ class CDATA:
     
     def _get_cdata_info(self):
 
-        file_list=self._get_file_list(extension='cdata', verbose=True)
+        file_list=self._get_file_list(extension='cdata', verbose=False)
         
         return file_list
     
@@ -24,139 +24,137 @@ class CDATA:
         for file in file_list.keys():
             print(f'{file}')
     
-    def _extract_selection_set_ids_for_file(self, file_path):
+    def _extract_selection_set_ids_for_file(self, file_path, selection_set_ids=None):
         """
-        Extracts selection set IDs from the given file.
+        Extracts selection set IDs and associated data (nodes and elements) from the given file using NumPy for optimization.
 
         Args:
             file_path (str): Path to the .cdata file.
+            selection_set_ids (list, optional): List of selection set IDs to extract. If None, process all.
 
         Returns:
-            list: A list of dictionaries containing selection set IDs and their respective data.
+            list: A list of dictionaries containing selection set data.
         """
+        
+        if selection_set_ids is not None and not isinstance(selection_set_ids, list):
+            raise ValueError("selection_set_ids must be a list of integers or None.")
+        
         selection_sets = []  # Store extracted data
 
         try:
             with open(file_path, 'r') as file:
                 lines = file.readlines()
 
+                # Convert lines to a NumPy array for efficient slicing
+                lines_array = np.array(lines, dtype=str)
+
                 # Iterate through lines to find *SELECTION_SET
-                for i, line in enumerate(lines):
+                for i, line in enumerate(lines_array):
                     if line.strip() == "*SELECTION_SET":
                         # Get SET_ID info
-                        set_id = int(lines[i + 1].strip())
-                        # Debugging information
-                        print(f"Found *SELECTION_SET at line {i + 1}: {line.strip()}")
+                        set_id = int(lines_array[i + 1].strip())
 
-                        # Further debugging or processing logic can go here
-                        try:
-                            set_id = int(lines[i + 1].strip())
-                            print(f"SET_ID at line {i + 2}: {set_id}")
-                        except (IndexError, ValueError) as e:
-                            print(f"Error reading SET_ID at line {i + 2}: {e}")
+                        # Skip if this selection set ID is not in the provided list
+                        if selection_set_ids is not None and set_id not in selection_set_ids:
+                            continue
+
+                        # Extract the SET_NAME, keeping only the name
+                        raw_set_name = lines_array[i + 2].strip()
+                        name_length = int(raw_set_name.split()[0])  # Extract the length of the name
+                        set_name = raw_set_name[len(str(name_length)) + 1 : len(str(name_length)) + 1 + name_length]  # Extract the actual name
+                        
+                        number_of_nodes = int(lines_array[i + 3].strip())
+                        number_of_elements = int(lines_array[i + 4].strip())
+
+                        # Initialize selection set data
+                        selection_set = {
+                            "SET_ID": set_id,
+                            "SET_NAME": set_name,
+                        }
+
+                        # Extract nodes if number_of_nodes > 0
+                        if number_of_nodes > 0:
+                            nodes_start_line = i + 5
+                            nodes_end_line = nodes_start_line + (number_of_nodes + 9) // 10
+                            node_lines = lines_array[nodes_start_line:nodes_end_line]
+                            # Combine and convert to a NumPy array
+                            selection_set["NODES"] = np.fromstring(" ".join(node_lines).strip(), sep=" ", dtype=int)
+
+                        # Extract elements if number_of_elements > 0
+                        if number_of_elements > 0:
+                            elements_start_line = nodes_end_line
+                            elements_end_line = elements_start_line + (number_of_elements + 9) // 10
+                            element_lines = lines_array[elements_start_line:elements_end_line]
+                            # Combine and convert to a NumPy array
+                            selection_set["ELEMENTS"] = np.fromstring(" ".join(element_lines).strip(), sep=" ", dtype=int)
+
+                        # Add the parsed selection set to the list
+                        selection_sets.append(selection_set)
 
         except Exception as e:
             print(f"Error processing file {file_path}: {e}")
             return []
 
         return selection_sets
-
-    def extract_all_selection_sets(self, CDATA_name:str):
+    
+    def extract_selection_set_ids(self, fileName, selection_set_ids=None):
         """
-        Extracts all selection sets from all .cdata files by reusing the existing method.
+        NOTE: THE BASE CLASS SHOULD EVETUALLY POIT TO THE NAME OF THE FILE, NOT THE FILE ITSELF
+        
+        Aggregates nodes and elements while maintaining the structure of each selection set.
+
+        Args:
+            fileName (str): Name of the `.cdata` file to process.
+            selection_set_ids (list, optional): List of selection set IDs to extract. If None, all sets are included.
 
         Returns:
-            list: A list of dictionaries containing selection set data for all files.
+            dict: A dictionary where each key is a selection set ID, and the value is another dictionary
+                containing 'SET_NAME', 'NODES', and 'ELEMENTS'.
         """
-        # Get the CDATA file mapping
-        file_mapping = self._get_file_list(extension='cdata', verbose=False)
-        file_list=file_mapping[CDATA_name]
-        all_selection_sets = []  # Store all selection sets across all files
+        if selection_set_ids is not None and not isinstance(selection_set_ids, list):
+            raise ValueError("selection_set_ids must be a list of integers or None.")
 
-        for file_info in file_list:
-            file_path = file_info['file']
-            try:
-                # Use the existing method to extract selection sets for a single file
-                selection_sets = self._extract_selection_set_ids_for_file(file_path)
-                
-                # Add the file's selection sets to the overall list
-                all_selection_sets.extend(selection_sets)
+        aggregated_data = {}
 
-            except Exception as e:
-                print(f"Error processing file {file_path}: {e}")
-
-        # Print a summary of extracted data
-        for s_set in all_selection_sets:
-            print(f"FILE: {s_set['FILE']}, SET_ID: {s_set['SET_ID']}, SET_NAME: {s_set['SET_NAME']}, "
-                f"NNODES: {s_set['NNODES']}, NELEMENTS: {s_set['NELEMENTS']}")
-            if s_set["NODES"]:
-                print(f"NODES: {s_set['NODES'][:10]}... ({len(s_set['NODES'])} total)")
-            if s_set["ELEMENTS"]:
-                print(f"ELEMENTS: {s_set['ELEMENTS'][:10]}... ({len(s_set['ELEMENTS'])} total)")
-
-        return all_selection_sets
-    
-    def _get_info_selectionSet(self, selection_set_id, CDATA_name:str):
-        # Get the CDATA file mapping
-        file_mapping=self._get_file_list(extension='cdata', verbose=False)
-        file_list=file_mapping[CDATA_name]
+        # Get the list of `.cdata` files
+        file_mapping = self._get_cdata_info()
         
-        for file in file_list:
-            file_path=file['file']
-            
-            selection_sets = []  # Store extracted data
-            
-            try:
-                with open(file_path, 'r') as file:
-                    lines = file.readlines()
-                    
-                    # Iterate through lines to find *SELECTION_SET
-                    for i, line in enumerate(lines):
-                        if line.strip() == "*SELECTION_SET":
-                            # Get the ID on the next line
-                            set_id = int(lines[i + 1].strip())  # Extract selection set ID
-                            if set_id==selection_set_id:
-                                set_name = lines[i + 2].strip()    # Extract name
-                                n_nodes = int(lines[i + 3].strip())  # Extract NNODES
-                                n_elements = int(lines[i + 4].strip())  # Extract NELEMENTS
-                                
-                                # Create a dictionary for this selection set
-                                selection_set = {
-                                    "SET_ID": set_id,
-                                    "SET_NAME": set_name,
-                                    "NNODES": n_nodes,
-                                    "NELEMENTS": n_elements,
-                                    "NODES": [],
-                                    "ELEMENTS": []
-                                }
-                                
-                                # Extract nodes and elements if they exist
-                                if n_nodes > 0:
-                                    selection_set["NODES"] = [
-                                        int(node)
-                                        for node in " ".join(lines[i + 5: i + 5 + (n_nodes + 9) // 10]).split()
-                                    ]
-                                
-                                if n_elements > 0:
-                                    selection_set["ELEMENTS"] = [
-                                        int(element)
-                                        for element in " ".join(lines[i + 5 + (n_nodes + 9) // 10:]).split()
-                                    ]
-                                
-                                # Append this set's data
-                                selection_sets.append(selection_set)
-                
-                # Print extracted data for verification
-                for s_set in selection_sets:
-                    print(f"SET_ID: {s_set['SET_ID']}, SET_NAME: {s_set['SET_NAME']}, "
-                        f"NNODES: {s_set['NNODES']}, NELEMENTS: {s_set['NELEMENTS']}")
-                    if s_set["NODES"]:
-                        print(f"NODES: {s_set['NODES'][:10]}... ({len(s_set['NODES'])} total)")
-                    if s_set["ELEMENTS"]:
-                        print(f"ELEMENTS: {s_set['ELEMENTS'][:10]}... ({len(s_set['ELEMENTS'])} total)")
+        if fileName not in file_mapping.keys():
+            raise ValueError(
+                f"File name '{fileName}' not found in the file mapping. The name should be one of the following: {list(file_mapping.keys())}"
+            )
 
-                return selection_sets
+        # Get a list of all the file paths
+        file_list = [item['file'] for sublist in file_mapping.values() for item in sublist]
 
-            except Exception as e:
-                print(f"Error processing file: {e}")
-                return []
+        for file_path in file_list:
+            # Extract selection sets for the current file
+            selection_sets = self._extract_selection_set_ids_for_file(file_path, selection_set_ids=selection_set_ids)
+
+            # Aggregate each selection set by its SET_ID
+            for selection_set in selection_sets:
+                set_id = selection_set["SET_ID"]
+
+                # Skip if the set ID is not in the provided list
+                if selection_set_ids is not None and set_id not in selection_set_ids:
+                    continue
+
+                if set_id not in aggregated_data:
+                    # Initialize a new entry for this selection set
+                    aggregated_data[set_id] = {
+                        "SET_NAME": selection_set["SET_NAME"],
+                        "NODES": set(selection_set.get("NODES", [])),
+                        "ELEMENTS": set(selection_set.get("ELEMENTS", [])),
+                    }
+                else:
+                    # Update existing entry by merging nodes and elements
+                    aggregated_data[set_id]["NODES"].update(selection_set.get("NODES", []))
+                    aggregated_data[set_id]["ELEMENTS"].update(selection_set.get("ELEMENTS", []))
+
+        # Convert sets to sorted lists for final output
+        for set_id in aggregated_data:
+            aggregated_data[set_id]["NODES"] = sorted(aggregated_data[set_id]["NODES"])
+            aggregated_data[set_id]["ELEMENTS"] = sorted(aggregated_data[set_id]["ELEMENTS"])
+
+        return aggregated_data
+
