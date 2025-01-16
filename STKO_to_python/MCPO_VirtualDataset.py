@@ -6,6 +6,7 @@ import yaml
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import concurrent.futures
+import re
 
 from .NODES import NODES
 from .ON_ELEMENTS import ON_ELEMENTS
@@ -46,6 +47,12 @@ class MCPO_VirtualDataset(NODES,
         # Get the results partitions
         self.results_partitions = self._get_results_partitions()
         
+        # Get model global information
+        self.model_stages= self.get_model_stages()
+        self.element_results_names=self.get_elements_results_names()
+        self.element_types=self.get_element_types()
+        self.node_results_names=self.get_node_results_names()
+        
         # Define the database path and directory
         self._define_virtual_paths(results_directory_name=results_directory_name, results_filename=results_filename)
         
@@ -75,6 +82,34 @@ class MCPO_VirtualDataset(NODES,
     
     def _get_results_partitions(self):
         """
+        Retrieve a sorted list of partition files matching the specified file extension,
+        and create a dictionary with part numbers as keys and file paths as values.
+
+        Returns:
+            dict: A dictionary where keys are part numbers and values are file paths.
+        """
+        results_partitions = sorted(glob.glob(f"{self.results_directory}/{self.file_extension}"))
+        
+        # Create a dictionary to hold part numbers as keys and file paths as values
+        part_data_dict = {}
+        
+        for partition in results_partitions:
+            # Assuming filenames like 'part-' where XX is the part number
+            match = re.search(r'part-(\d+)', partition)
+            if match:
+                part_number = int(match.group(1))  # Extract part number
+                
+                # Add part number as key and file path as value to the dictionary
+                part_data_dict[part_number] = partition
+        
+        print("Using the following partition files with part numbers:")
+        for part_number, file_path in part_data_dict.items():
+            print(f"{part_number}: {file_path}")
+        
+        return part_data_dict
+    
+    def _get_results_partitions_bak(self):
+        """
         Retrieve a sorted list of partition files matching the specified file extension.
         
         Returns:
@@ -87,6 +122,21 @@ class MCPO_VirtualDataset(NODES,
         return results_partitions
     
     def create_virtual_dataset(self):
+        """
+        Create or update the virtual dataset file.
+        """
+        if os.path.exists(self.virtual_data_set):
+            print(f"Virtual dataset already exists at {self.virtual_data_set}. File will be overwritten.")
+            os.remove(self.virtual_data_set)
+        else:
+            print(f"Creating virtual dataset at {self.virtual_data_set}...")
+
+        # Create an empty HDF5 file for the virtual dataset
+        with h5py.File(self.virtual_data_set, 'w') as virtual_h5:
+            print(f"Virtual dataset file created at {self.virtual_data_set}, ready for linking datasets.")
+
+    
+    def create_virtual_dataset_bak(self):
         """
         Create or update the virtual dataset by linking datasets from source partition files.
         """

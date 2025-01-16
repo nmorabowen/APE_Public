@@ -3,6 +3,7 @@ import numpy as np
 from collections import defaultdict
 import os
 import glob
+import re
 
 
 class GetModelInfo:
@@ -10,126 +11,185 @@ class GetModelInfo:
     
     def get_model_stages(self, verbose=False):
         """
-        Retrieve model stages from the virtual dataset.
-        
+        Retrieve model stages from all result partitions.
+
         Args:
             verbose (bool, optional): If True, prints the model stages.
-        
+
         Returns:
-            list: List of model stage names.
+            list: Sorted list of model stage names from all partitions.
         """
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            model_stages = [key for key in results.keys() if key.startswith("MODEL_STAGE")]
-            
-            if not model_stages:
-                raise ValueError("No model stages found in the virtual dataset.")
-            
-            if verbose:
-                print(f'The model stages found are: {model_stages}')
-            return model_stages
+        model_stages = []
+
+        # Use partition paths from the dictionary created by _get_results_partitions
+        for _, partition_path in self.results_partitions.items():
+            with h5py.File(partition_path, 'r') as results:
+                # Get model stages from the current partition file
+                partition_stages = [key for key in results.keys() if key.startswith("MODEL_STAGE")]
+                model_stages.extend(partition_stages)
+
+        # Remove duplicates by converting to a set, then back to a sorted list
+        model_stages = sorted(set(model_stages))
+
+        if not model_stages:
+            raise ValueError("No model stages found in the result partitions.")
+
+        if verbose:
+            print(f'The model stages found across partitions are: {model_stages}')
+
+        return model_stages
+
+
     
-    def get_elements_results_names(self, model_stage, verbose=False):
+    def get_elements_results_names(self, model_stage=None, verbose=False):
         """
-        Retrieve the names of element results for a given model stage.
+        Retrieve the names of element results for a given model stage from all result partitions.
         
         Args:
             model_stage (str): Name of the model stage.
             verbose (bool, optional): If True, prints the element results names.
         
         Returns:
-            list: List of element results names.
+            list: List of element results names across all partitions.
         """
-        # Check for model stage errors
-        self._model_stages_error(model_stage)
+        if model_stage is None:
+            model_stages=self.model_stages
+        else:
+            # Check for model stage errors
+            self._model_stages_error(model_stage)
+            model_stages=[model_stage]
         
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            ele_results = results.get(self.RESULTS_ON_ELEMENTS_PATH.format(model_stage=model_stage))
-            if ele_results is None:
-                raise ValueError("Element results group not found in the virtual dataset.")
+        element_results_names = []
+        for model_stage in model_stages:
+            # Iterate over all result partitions
+            for _, partition_path in self.results_partitions.items():
+                with h5py.File(partition_path, 'r') as results:
+                    # Get the element results for the given model stage
+                    ele_results = results.get(self.RESULTS_ON_ELEMENTS_PATH.format(model_stage=model_stage))
+                    if ele_results is None:
+                        continue  # Skip this partition if the element results group is not found
+                    
+                    # Append the element results names from this partition
+                    element_results_names.extend(ele_results.keys())
             
-            element_results_names = list(ele_results.keys())
+            # Remove duplicates by converting to a set and then back to a list
+            element_results_names = list(set(element_results_names))
+            
+            if not element_results_names:
+                raise ValueError(f"No element results found for model stage '{model_stage}' in the result partitions.")
+            
             if verbose:
-                print(f'The element results names found are: {element_results_names}')
-            return element_results_names
+                print(f'The element results names found across partitions for model stage "{model_stage}" are: {element_results_names}')
+        
+        return element_results_names
     
-    def get_element_types(self, model_stage, results_name=None, verbose=False):
+    def get_element_types(self, model_stage=None, results_name=None, verbose=False):
         """
         Retrieve the element types for a given result name and model stage.
         If results_name is None, get types for all results.
-        
+
         Args:
-            model_stage (str): Name of the model stage.
+            model_stage (str, optional): Name of the model stage. If None, retrieve results for all model stages.
             results_name (str, optional): Name of the results group.
             verbose (bool, optional): If True, prints the element types.
-        
+
         Returns:
             dict: Dictionary mapping results names to their element types.
         """
-        # Check for model stage errors
-        self._model_stages_error(model_stage)
-        
+        if model_stage is None:
+            model_stages = self.model_stages
+        else:
+            # Check for model stage errors
+            self._model_stages_error(model_stage)
+            model_stages = [model_stage]
+
         element_types_dict = {}
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            if results_name is None:
-                results_names = self.get_elements_results_names(model_stage)
-            else:
-                self._element_results_name_error(results_name, model_stage)
-                results_names = [results_name]
-            
-            for name in results_names:
-                ele_types = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stage))
-                if ele_types is None:
-                    raise ValueError(f"Element types group not found for {name}")
-                element_types_dict[name] = [key.split('[')[0] for key in ele_types.keys()]
-            
-            if verbose:
-                print(f'The element types found are: {element_types_dict}')
-            return element_types_dict
+        for stage in model_stages:
+            for _, partition_path in self.results_partitions.items():
+                with h5py.File(partition_path, 'r') as results:
+                    if results_name is None:
+                        results_names = self.get_elements_results_names(stage)
+                    else:
+                        self._element_results_name_error(results_name, stage)
+                        results_names = [results_name]
+
+                    for name in results_names:
+                        ele_types = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=stage))
+                        if ele_types is None:
+                            raise ValueError(f"Element types group not found for {name} in partition {partition}")
+                        if name not in element_types_dict:
+                            element_types_dict[name] = []
+                        element_types_dict[name].extend([key.split('[')[0] for key in ele_types.keys()])
+
+        # Remove duplicates in the lists of element types
+        for name in element_types_dict:
+            element_types_dict[name] = list(set(element_types_dict[name]))
+
+        if verbose:
+            print(f'The element types found are: {element_types_dict}')
+        return element_types_dict
+
         
-    def _get_all_types(self, model_stage):
+    def _get_all_types(self, model_stage=None):
         
-        # Check for model stage errors
-        self._model_stages_error(model_stage)
+        if model_stage is None:
+            model_stages = self.model_stages
+        else:
+            # Check for model stage errors
+            self._model_stages_error(model_stage)
+            model_stages = [model_stage]
         
         element_types = set()
-        
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            results_names = self.get_elements_results_names(model_stage)
-            for name in results_names:
-                ele_types = results.get(self.RESULTS_ON_ELEMENTS_PATH.format(model_stage=model_stage) + f"/{name}")
-                if ele_types is None:
-                    raise ValueError(f"Element types group not found for {name}")
-                element_types.update([key.split('[')[0] for key in ele_types.keys()])
+        for model_stage in model_stages:
+            for _, partition_path in self.results_partitions.items():
+                with h5py.File(partition_path, 'r') as results:
+                    results_names = self.get_elements_results_names(model_stage)
+                    for name in results_names:
+                        ele_types = results.get(self.RESULTS_ON_ELEMENTS_PATH.format(model_stage=model_stage) + f"/{name}")
+                        if ele_types is None:
+                            raise ValueError(f"Element types group not found for {name}")
+                        element_types.update([key.split('[')[0] for key in ele_types.keys()])
             
+                
             return sorted(list(element_types))
         
-    def get_node_results_names(self, model_stage, verbose=False):
+    def get_node_results_names(self, model_stage=None, verbose=False):
         """
         Retrieve the names of node results names for a given model stage.
-        
+
         Args:
-            model_stage (str): Name of the model stage.
+            model_stage (str, optional): Name of the model stage. If None, retrieve results for all model stages.
             verbose (bool, optional): If True, prints the node results names.
-        
+
         Returns:
             list: List of node results names.
         """
-        
-        #Check for model stage errors
-        self._model_stages_error(model_stage)
-        
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            nodes_groups = results.get(self.RESULTS_ON_NODES_PATH.format(model_stage=model_stage))
-            if nodes_groups is None:
-                raise ValueError("Nodes results group not found in the virtual dataset.")
-            
-            nodes_results = list(nodes_groups.keys())
+        if model_stage is None:
+            model_stages = self.model_stages
+        else:
+            # Check for model stage errors
+            self._model_stages_error(model_stage)
+            model_stages = [model_stage]
+
+        node_results_names = set()
+
+        for stage in model_stages:
+            for _, partition_path in self.results_partitions.items():
+                with h5py.File(partition_path, 'r') as results:
+                    nodes_groups = results.get(self.RESULTS_ON_NODES_PATH.format(model_stage=stage))
+                    if nodes_groups is None:
+                        continue  # Skip this partition if the nodes group is not found
+                    node_results_names.update(nodes_groups.keys())
+
             if verbose:
-                print(f'The node results found are: {nodes_results}')
-            
-            return nodes_results
+                print(f"Node results names for model stage '{stage}': {list(node_results_names)}")
+
+        if not node_results_names:
+            raise ValueError(f"No node results found for model stage(s): {', '.join(model_stages)} in the result partitions.")
+
+        return list(node_results_names)
         
-    def get_nodes_by_z_coordinate(self, model_stage, z_value, tolerance=1e-6):
+    def get_nodes_by_z_coordinate_bak(self, model_stage, z_value, tolerance=1e-6):
         """
         Retrieve all nodes at a specific z-coordinate value within a given tolerance.
         

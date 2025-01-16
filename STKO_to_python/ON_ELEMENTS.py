@@ -1,6 +1,7 @@
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+import re
 
 
 class ON_ELEMENTS:
@@ -8,13 +9,12 @@ class ON_ELEMENTS:
     
     def _get_all_element_index(self, element_type=None):
         """
-        Fetch information for all elements of a given type in a specific model stage.
+        Fetch information for all elements of a given type in the partition files.
         If no element type is provided, fetch information for all element types.
 
         Args:
             element_type (str or None): The type of elements to fetch (e.g., 'ElasticBeam3d'). 
                                         If None, fetches all element types.
-            model_stage (str): The model stage to query.
 
         Returns:
             list: A list of dictionaries containing element information.
@@ -30,33 +30,39 @@ class ON_ELEMENTS:
         # List to store all elements' information
         elements_info = []
 
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            # Loop through each element type
-            for etype in element_types:
-                element_group = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stages[0], element_type=etype))
-                
-                if element_group is None:
-                    print(f"Warning: Element type '{etype}' not found in the virtual dataset.")
-                    continue
-                
-                # Loop through each element in the group
-                for element in element_group.keys():
-                    element_name = element.split('[')[0]
-                    file_name = element.split('file')[1]
+        # Regular expression to extract `fileXX`
+        file_regex = re.compile(r'file(\d+)')
 
-                    if element_name == etype:
-                        dataset = element_group[element]
-                        data = dataset[:]  # Load dataset
+        # Loop through partition files
+        for part_number, partition_path in self.results_partitions.items():
+            with h5py.File(partition_path, 'r') as partition:
+                # Loop through each element type
+                for etype in element_types:
+                    element_group = partition.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stages[0], element_type=etype))
 
-                        # Collect info for each element
-                        for idx, element_data in enumerate(data):
-                            elements_info.append({
-                                'element_id': element_data[0],
-                                'element_idx': idx,
-                                'node_coordinates_list': element_data[1:],  # Node data (e.g., coordinates or connectivity)
-                                'file_name': '_file' + file_name,
-                                'element_type': etype
-                            })
+                    if element_group is None:
+                        print(f"Warning: Element type '{etype}' not found in partition {partition_path}.")
+                        continue
+
+                    # Loop through each element in the group
+                    for element in element_group.keys():
+                        element_name = element.split('[')[0]
+                        file_name_match = file_regex.search(element)
+                        file_name = part_number
+
+                        if element_name == etype:
+                            dataset = element_group[element]
+                            data = dataset[:]  # Load dataset
+
+                            # Collect info for each element
+                            for idx, element_data in enumerate(data):
+                                elements_info.append({
+                                    'element_id': element_data[0],
+                                    'element_idx': idx,
+                                    'node_list': element_data[1:],  # Node data (e.g., coordinates or connectivity)
+                                    'file_name': file_name,
+                                    'element_type': etype
+                                })
 
         return elements_info
 
@@ -89,7 +95,7 @@ class ON_ELEMENTS:
             for element in element_group.keys():
                 # Get the relevant name data
                 element_name = element.split('[')[0]
-                file_name = element.split('_file')[1]
+                file_name = element.split('file')[1]
 
                 if element_name == element_type:
                     dataset = element_group[element]

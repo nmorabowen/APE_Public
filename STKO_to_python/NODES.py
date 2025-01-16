@@ -11,46 +11,54 @@ class NODES:
     
     def _get_all_nodes_ids(self):
         """
-        Retrieve all node IDs, file names, indices, and coordinates for a given model stage.
-        
-        Args:
-            model_stage (str): The model stage to query.
-        
+        Retrieve all unique node IDs, file names, indices, and coordinates from the partition files.
+
         Returns:
-            np.ndarray: A structured array with node IDs, file names, indices, and individual coordinates (x, y, z).
+            np.ndarray: A structured array with unique node IDs, file names, indices, and individual coordinates (x, y, z).
         """
-        
-        model_stages= self.get_model_stages()
-        
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            nodes_group = results.get(self.MODEL_NODES_PATH.format(model_stage=model_stages[0]))
-            if nodes_group is None:
-                raise ValueError("Nodes group not found in the virtual dataset.")
-            
-            nodes = []
-            file_ids = []
-            indices = []
-            xs, ys, zs = [], [], []
-            for key in nodes_group.keys():
-                if key.startswith("ID"):
-                    file_id = key.replace("ID_", "")
-                    node_ids = nodes_group[key][...]
-                    coord_key = key.replace("ID", "COORDINATES")
-                    if coord_key in nodes_group:
-                        coords = nodes_group[coord_key][...]
-                        nodes.extend(node_ids)
-                        file_ids.extend([file_id] * len(node_ids))
-                        indices.extend(range(len(node_ids)))
-                        xs.extend(coords[:, 0])
-                        ys.extend(coords[:, 1])
-                        zs.extend(coords[:, 2])
-            
-            return np.array([nodes, file_ids, indices, xs, ys, zs])
+        node_data = {}
+
+        for part_number, partition_path in self.results_partitions.items():
+            with h5py.File(partition_path, 'r') as partition:
+                nodes_group = partition.get(self.MODEL_NODES_PATH.format(model_stage=self.get_model_stages()[0]))
+                if nodes_group is None:
+                    continue  # Skip this partition if the nodes group is not found
+
+                for key in nodes_group.keys():
+                    if key.startswith("ID"):
+                        file_id = part_number
+                        node_ids = nodes_group[key][...]
+                        coord_key = key.replace("ID", "COORDINATES")
+                        if coord_key in nodes_group:
+                            coords = nodes_group[coord_key][...]
+                            for index, (node_id, coord) in enumerate(zip(node_ids, coords)):
+                                # Use node_id as a unique key to avoid duplicates
+                                if node_id not in node_data:
+                                    node_data[node_id] = (file_id, index, coord[0], coord[1], coord[2])
+
+        # Convert the dictionary to a structured NumPy array
+        dtype = np.dtype([
+            ('node_id', 'i8'),
+            ('file_id', 'U50'),
+            ('index', 'i8'),
+            ('x', 'f8'),
+            ('y', 'f8'),
+            ('z', 'f8')
+        ])
+
+        # Create the structured array from unique node data
+        unique_nodes = [
+            (node_id, *values) for node_id, values in node_data.items()
+        ]
+
+        return np.array(unique_nodes, dtype=dtype)
 
 
     
     def get_node_id(self, model_stage, node_ids):
         """
+        NOTE: UPDATE WITH MAPPING FUNCTION
+        
         Get node information including indices, file locations, and coordinates for specified node IDs.
         Parameters
         ----------
@@ -109,6 +117,8 @@ class NODES:
     
     def get_node_coordinates(self, model_stage, node_ids=None):
         """
+        NOTE: UPDATE WITH MAPPING FUNCTION
+        
         Retrieve the coordinates of specified node IDs for a given model stage.
         
         Args:
@@ -143,6 +153,106 @@ class NODES:
                                     node_list.append(node_id)
                                     coords.append(coordinates[id_to_index[node_id]])
             return {'node list': np.array(node_list), 'coordinates': np.array(coords)}
+    
+    def _get_nodal_results_mapping(self, model_stage, results_name, node_ids=None, overwrite=False):
+        """
+        Map nodal results into an HDF5 group for efficient access. If `node_ids` is None, process all nodes.
+
+        Args:
+            model_stage (str): The model stage name.
+            results_name (str): The name of the results group.
+            node_ids (list, optional): List of node IDs to process. If None, process all nodes in the model stage.
+            overwrite (bool): If True, overwrite existing data. Defaults to False.
+
+        Returns:
+            None
+        """
+        # Validate the results name
+        self._nodal_results_name_error(results_name, model_stage)
+
+        # Retrieve all nodes if `node_ids` is not provided
+        if node_ids is None:
+            nodes_info = self._get_all_nodes_ids()
+            if nodes_info.size == 0:
+                raise ValueError(f"No nodes found in the model stage '{model_stage}'.")
+        else:
+            # Retrieve node info: A list of tuples (node_id, file_id, index)
+            nodes_info = self.get_node_files_and_indices(node_ids=node_ids)
+            if nodes_info.size == 0:
+                raise ValueError("No nodes found in the dataset.")
+
+        # Open the HDF5 file
+        with h5py.File(self.virtual_data_set, 'a') as h5file:
+            # Create or retrieve the output group
+            output_group_path = f"/TH/{model_stage}/{results_name}"
+            if output_group_path in h5file:
+                output_group = h5file[output_group_path]
+            else:
+                output_group = h5file.create_group(output_group_path)
+
+            # Loop over partition files
+            for part_number, partition_path in self.results_partitions.items():
+                with h5py.File(partition_path, 'r') as partition:
+                    # Construct the base path
+                    base_path = self.RESULTS_ON_NODES_PATH.format(
+                        model_stage=model_stage
+                    ) + f"/{results_name}"
+
+                    nodes_group = partition.get(base_path)
+                    if nodes_group is None:
+                        print(f"The path '{base_path}' does not exist in the partition '{partition_path}'. Skipping.")
+                        continue
+
+                    # Access the "DATA" group
+                    data_group = nodes_group.get("DATA")
+                    if data_group is None:
+                        raise ValueError(f"The DATA group does not exist under the path '{base_path}' in partition '{partition_path}'.")
+
+                    # Loop over each node's information
+                    for node_id, file_id, node_index, _, _, _ in nodes_info:
+                        # Filter steps by file_id and sort them
+                        all_steps = list(data_group.keys())
+                        relevant_steps = [step for step in all_steps if step.endswith(str(file_id))]
+
+                        if not relevant_steps:
+                            print(f"No data found for Node ID {node_id} in partition '{partition_path}'.")
+                            continue
+
+                        step_numbers = [int(step.split("_")[1]) for step in relevant_steps]
+                        sorted_indices = np.argsort(step_numbers)
+                        sorted_steps = [relevant_steps[i] for i in sorted_indices]
+
+                        # Check if the dataset for this node already exists
+                        node_dataset_path = f"{output_group_path}/Node_{node_id}"
+                        if node_dataset_path in h5file:
+                            if overwrite:
+                                del h5file[node_dataset_path]  # Remove if overwrite is True
+                            else:
+                                print(f"Dataset for Node {node_id} already exists in '{output_group_path}'. Skipping.")
+                                continue
+
+                        num_steps = len(sorted_steps)
+                        first_dataset = data_group[sorted_steps[0]]
+                        num_components = first_dataset.shape[1] if len(first_dataset.shape) > 1 else 1
+
+                        # Preallocate the dataset in the output group
+                        node_dataset = output_group.create_dataset(
+                            f"Node_{node_id}",
+                            shape=(num_steps, 1 + num_components),
+                            dtype=first_dataset.dtype
+                        )
+
+                        # Populate the dataset
+                        for i, step_name in enumerate(sorted_steps):
+                            step_num = int(step_name.split("_")[1])
+                            result_data = data_group[step_name][node_index]
+                            node_dataset[i, 0] = step_num  # Step number
+                            node_dataset[i, 1:] = result_data  # Result components
+
+            print(f"Results for nodes {'all' if node_ids is None else node_ids} mapped to group '{output_group_path}' in the HDF5 file.")
+
+        
+        
             
     def _get_nodal_results(self, model_stage, node_id, results_name):
         """
@@ -255,7 +365,9 @@ class NODES:
         return results_array
     
     def get_node_info(self, model_stage, node_id):
-        """Get node's index, file location, and coordinates."""
+        """
+        NOTE: USELESS DUE TO MAPPING FUNCTION
+        Get node's index, file location, and coordinates."""
         
         with h5py.File(self.virtual_data_set, 'r') as h5file:
             # Get node index and file
