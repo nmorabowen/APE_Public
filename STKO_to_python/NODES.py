@@ -78,31 +78,28 @@ class NODES:
     
     def _get_nodal_results_mapping(self, model_stage, results_name, node_ids=None, overwrite=False):
         """
-        Map nodal results into an HDF5 group for efficient access. If `node_ids` is None, process all nodes.
+        Map nodal results into an HDF5 group for efficient access using batch processing.
 
         Args:
             model_stage (str): The model stage name.
             results_name (str): The name of the results group.
-            node_ids (list, optional): List of node IDs to process. If None, process all nodes in the model stage.
+            node_ids (list, optional): List of node IDs to process. If None, process all nodes.
             overwrite (bool): If True, overwrite existing data. Defaults to False.
 
         Returns:
             None
         """
-        # Validate the results name
-        self._nodal_results_name_error(results_name, model_stage)
+        # Validate and prepare inputs
+        node_ids = self._validate_and_prepare_inputs(
+            model_stage, results_name, node_ids, None
+        )
 
-        # Retrieve all nodes if `node_ids` is not provided
-        if node_ids is None:
-            nodes_info = self._get_all_nodes_ids()
-            if nodes_info.size == 0:
-                raise ValueError(f"No nodes found in the model stage '{model_stage}'.")
-        else:
-            # Retrieve node info: A list of tuples (node_id, file_id, index)
-            nodes_info = self.get_node_files_and_indices(node_ids=node_ids)
-            if nodes_info.size == 0:
-                raise ValueError("No nodes found in the dataset.")
-
+        # Get node files and indices information
+        nodes_info = self.get_node_files_and_indices(node_ids=node_ids)
+        
+        # Group nodes by file_id for batch processing
+        file_groups = nodes_info.groupby('file_id')
+        
         # Open the HDF5 file
         with h5py.File(self.virtual_data_set, 'a') as h5file:
             # Create or retrieve the output group
@@ -112,69 +109,60 @@ class NODES:
             else:
                 output_group = h5file.create_group(output_group_path)
 
-            for node_id, file_id, node_index, _, _, _ in nodes_info:
-                file_info=self.partition_files[file_id]
-            
-            # Loop over partition files
-            for part_number, partition_path in self.results_partitions.items():
-                with h5py.File(partition_path, 'r') as partition:
-                    # Construct the base path
-                    base_path = self.RESULTS_ON_NODES_PATH.format(
-                        model_stage=model_stage
-                    ) + f"/{results_name}"
-
-                    nodes_group = partition.get(base_path)
-                    if nodes_group is None:
-                        print(f"The path '{base_path}' does not exist in the partition '{partition_path}'. Skipping.")
+            # Process each file only once, reading multiple nodes
+            for file_id, group in file_groups:
+                base_path = self.RESULTS_ON_NODES_PATH.format(
+                    model_stage=model_stage
+                ) + f"/{results_name}/DATA"
+                
+                with h5py.File(self.results_partitions[int(file_id)], 'r') as partition:
+                    data_group = partition.get(base_path)
+                    if data_group is None:
+                        print(f"The path '{base_path}' does not exist in partition {file_id}. Skipping.")
                         continue
 
-                    # Access the "DATA" group
-                    data_group = nodes_group.get("DATA")
-                    if data_group is None:
-                        raise ValueError(f"The DATA group does not exist under the path '{base_path}' in partition '{partition_path}'.")
+                    # Get all steps for this file
+                    all_steps = list(data_group.keys())
+                    step_numbers = [int(step.split("_")[1]) for step in all_steps]
+                    sorted_indices = np.argsort(step_numbers)
+                    sorted_steps = [all_steps[i] for i in sorted_indices]
 
-                    # Loop over each node's information
-                    for node_id, file_id, node_index, _, _, _ in nodes_info:
-                        # Filter steps by file_id and sort them
-                        all_steps = list(data_group.keys())
-                        relevant_steps = [step for step in all_steps if step.endswith(str(file_id))]
+                    if not sorted_steps:
+                        continue
 
-                        if not relevant_steps:
-                            print(f"No data found for Node ID {node_id} in partition '{partition_path}'.")
-                            continue
-
-                        step_numbers = [int(step.split("_")[1]) for step in relevant_steps]
-                        sorted_indices = np.argsort(step_numbers)
-                        sorted_steps = [relevant_steps[i] for i in sorted_indices]
-
-                        # Check if the dataset for this node already exists
+                    # Get shape information from first dataset
+                    first_dataset = data_group[sorted_steps[0]]
+                    num_components = first_dataset.shape[1] if len(first_dataset.shape) > 1 else 1
+                    
+                    # Process each node in the group
+                    for _, node_row in group.iterrows():
+                        node_id = node_row['node_id']
+                        node_index = node_row['index']
+                        
+                        # Check if dataset exists and handle overwrite
                         node_dataset_path = f"{output_group_path}/Node_{node_id}"
                         if node_dataset_path in h5file:
                             if overwrite:
-                                del h5file[node_dataset_path]  # Remove if overwrite is True
+                                del h5file[node_dataset_path]
                             else:
-                                print(f"Dataset for Node {node_id} already exists in '{output_group_path}'. Skipping.")
+                                print(f"Dataset for Node {node_id} already exists. Skipping.")
                                 continue
 
-                        num_steps = len(sorted_steps)
-                        first_dataset = data_group[sorted_steps[0]]
-                        num_components = first_dataset.shape[1] if len(first_dataset.shape) > 1 else 1
-
-                        # Preallocate the dataset in the output group
+                        # Create dataset for this node
                         node_dataset = output_group.create_dataset(
                             f"Node_{node_id}",
-                            shape=(num_steps, 1 + num_components),
+                            shape=(len(sorted_steps), 1 + num_components),
                             dtype=first_dataset.dtype
                         )
 
                         # Populate the dataset
-                        for i, step_name in enumerate(sorted_steps):
+                        for step_idx, step_name in enumerate(sorted_steps):
                             step_num = int(step_name.split("_")[1])
                             result_data = data_group[step_name][node_index]
-                            node_dataset[i, 0] = step_num  # Step number
-                            node_dataset[i, 1:] = result_data  # Result components
+                            node_dataset[step_idx, 0] = step_num
+                            node_dataset[step_idx, 1:] = result_data
 
-            print(f"Results for nodes {'all' if node_ids is None else node_ids} mapped to group '{output_group_path}' in the HDF5 file.")
+            print(f"Results mapped to group '{output_group_path}' in the HDF5 file.")
 
     
     def get_nodal_results(self, model_stage=None, results_name=None, node_ids=None, selection_set_id=None):
@@ -289,17 +277,17 @@ class NODES:
         
         # Results name validation
         if results_name not in self.node_results_names:
-            raise ValueError(f"Results name '{results_name}' not found in the dataset.")
+            raise ValueError(f"Results name '{results_name}' not found in the dataset. Available names: {self.node_results_names}")
         
         # Model stage validation (only if specified)
         if model_stage is not None and model_stage not in self.model_stages:
-            raise ValueError(f"Model stage '{model_stage}' not found in the dataset.")
+            raise ValueError(f"Model stage '{model_stage}' not found in the dataset. Available stages: {self.model_stages}")
         
         # Handle selection set
         if selection_set_id is not None:
             selection_set = self.selection_set[selection_set_id]
             if not selection_set or "NODES" not in selection_set:
-                raise ValueError(f"Selection set ID '{selection_set_id}' does not contain nodes.")
+                raise ValueError(f"Selection set ID '{selection_set_id}' does not contain nodes. Valid ids are: {list(self.selection_set.keys())}")
             return np.array(selection_set["NODES"])
         
         # Handle node_ids

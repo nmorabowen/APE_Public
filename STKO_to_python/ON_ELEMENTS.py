@@ -102,7 +102,7 @@ class ON_ELEMENTS:
             }
         
     
-    def get_element_results_for_type_and_id(self, result_name, element_type, element_id, model_stage):
+    def get_element_results_for_type_and_id_bak(self, result_name, element_type, element_id, model_stage):
         
         # Check for errors in result name and element type, and model stage
         self._model_stages_error(model_stage)
@@ -204,6 +204,110 @@ class ON_ELEMENTS:
             # Get the node connectivity for the specific element
             connectivity_data = connectivity_group[element_id]
             return connectivity_data.tolist()
+        
+    def get_element_results(self, model_stage=None, results_name=None, element_ids=None, selection_set_id=None):
+        """
+        Get element results optimized for numerical operations.
+        Returns results as a structured NumPy array or DataFrame for efficient computation.
+
+        Args:
+            model_stage (str, optional): The model stage name. If None, gets results for all stages.
+            results_name (str): The name of the result to retrieve.
+            element_ids (int, list, or np.ndarray, optional): Single element ID, a list, or a NumPy array of element IDs.
+            selection_set_id (int, optional): The ID of the selection set to retrieve elements from.
+
+        Returns:
+            pd.DataFrame: A DataFrame with MultiIndex (stage, element_id, step) if model_stage is None,
+                        or Index (element_id, step) if model_stage is specified.
+                        Columns represent the components of the results.
+        """
+        # Input validation
+        element_ids = self._validate_and_prepare_element_inputs(
+            model_stage, results_name, element_ids, selection_set_id, target='element'
+        )
+
+        # If no specific model stage is given, process all stages
+        if model_stage is None:
+            all_results = []
+            for stage in self.model_stages:
+                try:
+                    stage_results = self._get_stage_element_results(
+                        stage, results_name, element_ids
+                    )
+                    stage_results['stage'] = stage  # Add stage information
+                    all_results.append(stage_results)
+                except Exception as e:
+                    print(f"Warning: Could not retrieve results for stage {stage}: {str(e)}")
+                    continue
+
+            if not all_results:
+                raise ValueError("No results found for any stage")
+
+            # Combine all stages into a single DataFrame
+            return pd.concat(all_results, axis=0)
+
+        # If specific model stage is given, process just that stage
+        return self._get_stage_element_results(model_stage, results_name, element_ids)
+
+    def _get_stage_element_results(self, model_stage, results_name, element_ids):
+        """
+        Helper function to get results for a specific model stage.
+        """
+        # Get element files and indices information
+        elements_info = self.get_element_files_and_indices(element_ids=element_ids)
+
+        # Group elements by file_id for batch processing
+        file_groups = elements_info.groupby('file_id')
+
+        # Base path for results
+        base_path = f"{model_stage}/RESULTS/ON_ELEMENTS/{results_name}/DATA"
+
+        # List to store all results before combining
+        all_results = []
+
+        # Process each file only once, reading multiple elements
+        for file_id, group in file_groups:
+            with h5py.File(self.results_partitions[int(file_id)], 'r') as results:
+                data_group = results.get(base_path)
+                if data_group is None:
+                    raise ValueError(f"DATA group not found in path '{base_path}'.")
+
+                # Get all step names once
+                step_names = list(data_group.keys())
+
+                # Pre-fetch all element indices for this file
+                element_indices = group['index'].values
+                file_element_ids = group['element_id'].values
+
+                # Process all steps
+                for step_idx, step_name in enumerate(step_names):
+                    dataset = data_group[step_name]
+                    # Read all required indices at once
+                    step_data = dataset[element_indices]
+
+                    # Create DataFrame for this step
+                    step_df = pd.DataFrame(
+                        step_data,
+                        index=file_element_ids,
+                        columns=[f'component_{i}' for i in range(step_data.shape[1])]
+                    )
+                    step_df['step'] = step_idx
+                    step_df['step_name'] = step_name
+                    step_df['element_id'] = file_element_ids
+
+                    all_results.append(step_df)
+
+        if not all_results:
+            raise ValueError(f"No results found for stage {model_stage}")
+
+        # Combine all results into a single DataFrame
+        combined_results = pd.concat(all_results, axis=0)
+
+        # Set up MultiIndex
+        combined_results.set_index(['element_id', 'step'], inplace=True)
+        combined_results.sort_index(inplace=True)
+
+        return combined_results
 
     
 
