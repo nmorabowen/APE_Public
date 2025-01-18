@@ -1,5 +1,6 @@
 import h5py
 import numpy as np
+import pandas as pd
 
 class MAPPING:
     def build_and_store_mappings(self):
@@ -7,190 +8,219 @@ class MAPPING:
         Build and store node and element mappings for efficient lookups.
         Includes node lists for each element with -1 padding for consistency.
         """
-        node_mappings = []
-        element_mappings = []
-
+        
+        # Get the nodes array info
+        nodes_array=self.nodes_info['array']
+        # Fetch and map elements for this partition
+        element_array = self.elements_info['dataframe']
+        
         with h5py.File(self.virtual_data_set, 'r+') as h5file:
-            # Use the first model stage to fetch node coordinates since they are consistent across stages
-            model_stages = self.get_model_stages()
-            if not model_stages:
-                raise ValueError("No model stages found in the dataset.")
-
-            # Fetch and map nodes from the first stage only
-            first_stage = model_stages[0]
-
-            for part_number, partition_path in self.results_partitions.items():
-                with h5py.File(partition_path, 'r') as partition:
-                    nodes_info = self._get_all_nodes_ids()
-
-                    for node_id, file_id, index, x, y, z in nodes_info:
-                        node_mappings.append((node_id, file_id, index, x, y, z))
-
-                    # Fetch and map elements for this partition
-                    element_data = self._get_all_element_index()
-
-                    # Calculate maximum number of nodes per element for array sizing
-                    max_nodes = max(len(elem['node_list']) for elem in element_data)
-
-                    # Create element mappings including the node list
-                    for elem in element_data:
-                        # Create a fixed-size array of node IDs, padded with -1
-                        node_list = np.full(max_nodes, -1, dtype=np.int64)
-                        # Fill in the actual node IDs
-                        node_list[:len(elem['node_list'])] = elem['node_list']
-
-                        element_mappings.append((
-                            elem['element_id'],
-                            elem['file_name'],
-                            elem['element_idx'],
-                            elem['element_type'],
-                            node_list
-                        ))
 
             # Save to HDF5 with compression and chunking
             mapping_group = h5file.require_group("/Mappings")
 
-            # Convert to structured numpy arrays for better query efficiency
-            node_dtype = np.dtype([
-                ('node_id', 'i8'),
-                ('file_id', 'S50'),
-                ('index', 'i8'),
-                ('x', 'f8'),
-                ('y', 'f8'),
-                ('z', 'f8')
-            ])
-
-            element_dtype = np.dtype([
-                ('element_id', 'i8'),
-                ('file_name', 'S50'),
-                ('element_idx', 'i8'),
-                ('element_type', 'S50'),
-                ('node_list', f'i8', (max_nodes,))  # Fixed-size array for node IDs
-            ])
-
-            # Write the mappings
-            node_array = np.array(node_mappings, dtype=node_dtype)
-            element_array = np.array(element_mappings, dtype=element_dtype)
-
-            # Save datasets with compression
-            mapping_group.create_dataset("Nodes", data=node_array, compression="gzip", compression_opts=9)
-            mapping_group.create_dataset("Elements", data=element_array, compression="gzip", compression_opts=9)
+            # Save datasets
+            mapping_group.create_dataset("Nodes", data=nodes_array)
+            #mapping_group.create_dataset("Elements", data=element_array)
+            node_lists = element_array.pop('node_list')  # remove node_list, but keep index alignment
+            element_array.to_hdf(self.virtual_data_set, key="Elements", mode="a", format="table", data_columns=True)  
 
     def get_node_files_and_indices(self, node_ids):
         """
-        Retrieve files, indices, and coordinates for a list of nodes using vectorized NumPy operations.
+        Retrieve node file associations and indices for a list of node IDs.
 
-        Args:
-            node_ids (list[int]): List of Node IDs to lookup.
+        This method filters the `nodes_info` DataFrame to return only the rows
+        corresponding to the specified node IDs. Each row includes details about
+        the nodes, such as their indices and associated file names.
 
+        Parameters
+        ----------
+        node_ids : list of int
+            A list of node IDs for which the file and index information is requested.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing information about the specified nodes, including
+            the `node_id`, associated file names, and indices. The structure depends
+            on the columns available in `self.nodes_info['dataframe']`.
+
+        Raises
+        ------
+        ValueError
+            If `node_ids` is not a list or any of its elements are not integers.
+
+        Examples
+        --------
+        Suppose `self.nodes_info['dataframe']` contains the following data:
+        
+        >>> nodes_info = pd.DataFrame({
+        ...     'node_id': [1, 2, 3, 4],
+        ...     'file': ['file1', 'file2', 'file1', 'file3'],
+        ...     'index': [0, 1, 2, 3]
+                'x': [0.0]
+                'y': [0.0]
+                'z': [0.0]
+        ... })
+
+        Calling the method with a list of node IDs:
+        
+        >>> get_node_files_and_indices([1, 3])
         Returns:
-            np.ndarray: A structured array with dtype containing 'node_id', 'file_id', 'index', 'x', 'y', 'z'.
+            node_id   file   index x y z
+        0        1  file1       0
+        1        3  file1       2
+
+        Notes
+        -----
+        - This method relies on `self.nodes_info['dataframe']` being a valid pandas
+        DataFrame with at least the column `node_id`.
+        - Ensure `self.nodes_info` is correctly populated before calling this method.
+
         """
-        if not isinstance(node_ids, list) or not all(isinstance(id, int) for id in node_ids):
+        
+        if isinstance(node_ids, (int, float)):
+            node_ids = [node_ids]
+        
+        if not isinstance(node_ids, (list, np.ndarray)):
             raise ValueError("node_ids should be a list of integers")
 
-        with h5py.File(self.virtual_data_set, 'r') as h5file:
-            # Load mappings as structured array
-            nodes_mapping = h5file['/Mappings/Nodes'][:]
-            node_ids_array = np.array(node_ids)
+        nodes_info = self.nodes_info['dataframe']
+        filter_nodes_info = nodes_info[nodes_info['node_id'].isin(node_ids)]
 
-            # Find indices of matches using vectorized operations
-            sorter = np.argsort(nodes_mapping['node_id'])
-            sorted_ids = nodes_mapping['node_id'][sorter]
-            indices = sorter[np.searchsorted(sorted_ids, node_ids_array)]
-
-            # Create mask for valid matches
-            mask = (indices < len(nodes_mapping)) & (nodes_mapping['node_id'][indices] == node_ids_array)
-
-            # Initialize results with default dtype
-            dtype = np.dtype([
-                ('node_id', 'i8'),
-                ('file_id', 'U50'),
-                ('index', 'i8'),
-                ('x', 'f8'),
-                ('y', 'f8'),
-                ('z', 'f8')
-            ])
-            results = np.zeros(len(node_ids), dtype=dtype)
-
-            # Fill results with default values for unmatched nodes
-            results['node_id'] = node_ids_array
-            results['file_id'] = np.full(len(node_ids), '', dtype='U50')
-            results['index'] = -1
-            results['x'] = np.nan
-            results['y'] = np.nan
-            results['z'] = np.nan
-
-            # Fill in matched values
-            if np.any(mask):
-                results['file_id'][mask] = np.char.decode(nodes_mapping['file_id'][indices[mask]], 'utf-8')
-                results['index'][mask] = nodes_mapping['index'][indices[mask]]
-                results['x'][mask] = nodes_mapping['x'][indices[mask]]
-                results['y'][mask] = nodes_mapping['y'][indices[mask]]
-                results['z'][mask] = nodes_mapping['z'][indices[mask]]
-
-            return results
+        return filter_nodes_info
 
 
     def get_element_files_and_indices(self, element_ids):
         """
-        Store and query elements based on their IDs, efficiently handling large datasets.
+        Retrieve element file associations and indices for a list of element IDs.
 
-        Args:
-            element_ids (list[int]): List of Element IDs to lookup.
+        This method filters the `elements_info` DataFrame to return only the rows
+        corresponding to the specified element IDs. Each row includes details about
+        the elements, such as their indices and associated file names.
 
+        Parameters
+        ----------
+        element_ids : list of int
+            A list of element IDs for which the file and index information is requested.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing information about the specified elements, including
+            the `element_id`, associated file names, and indices. The structure depends
+            on the columns available in `self.elements_info['dataframe']`.
+
+        Raises
+        ------
+        ValueError
+            If `element_ids` is not a list of integers.
+
+        Examples
+        --------
+        Suppose `self.elements_info['dataframe']` contains the following data:
+        
+        >>> elements_info = pd.DataFrame({
+        ...     'element_id': [101, 102, 103, 104],
+        ...     'element_idx': ['file1', 'file2', 'file3', 'file4'],
+        ...     'file_name': [0, 1, 2, 3]
+                'element_type': ['beam', 'beam', 'beam', 'beam']
+        ... })
+
+        Calling the method with a list of element IDs:
+        
+        >>> get_element_files_and_indices([101, 103])
         Returns:
-            np.ndarray: Structured array containing elements with fields:
-                - element_id
-                - file_name
-                - element_idx
-                - element_type
-                - node_list
+            element_id   element_idx   file_name element_type
+
+        Notes
+        -----
+        - This method relies on `self.elements_info['dataframe']` being a valid pandas
+        DataFrame with at least the column `element_id`.
+        - Ensure `self.elements_info` is correctly populated before calling this method.
+
         """
-        if not isinstance(element_ids, list):
-            raise ValueError("element_ids should be a list of integers")
+        if element_ids is int:
+            element_ids=[element_ids]
+        
+        if not isinstance(element_ids, (list, np.ndarray)):
+            raise ValueError("element_ids should be a list or numpy array of integers")
 
-        with h5py.File(self.virtual_data_set, 'r') as h5file:
-            # Load the element mappings
-            element_mapping = h5file['/Mappings/Elements'][:]
+        elements_info = self.elements_info['dataframe']
+        filter_elements_info = elements_info[elements_info['element_id'].isin(element_ids)]
 
-            # Convert to NumPy for efficient processing
-            element_ids_array = np.array(element_ids, dtype=np.int64)
+        return filter_elements_info
+    
+    def get_selection_set_nodes_elements(self, selection_set_ids):
+        """
+        Retrieve nodes and elements information for one or more selection sets.
 
-            # Sort and find matches using vectorized operations
-            sorter = np.argsort(element_mapping['element_id'])
-            sorted_ids = element_mapping['element_id'][sorter]
-            indices = sorter[np.searchsorted(sorted_ids, element_ids_array)]
+        This method extracts the node and element IDs from the specified selection sets
+        and retrieves their associated file and index information.
 
-            # Create mask for valid matches
-            mask = (indices < len(element_mapping)) & (element_mapping['element_id'][indices] == element_ids_array)
+        Parameters
+        ----------
+        selection_set_ids : int or list of int
+            A single selection set ID or a list of selection set IDs.
 
-            # Prepare structured array for results
-            dtype = np.dtype([
-                ('element_id', 'i8'),
-                ('file_name', 'U50'),
-                ('element_idx', 'i8'),
-                ('element_type', 'U50'),
-                ('node_list', 'i8', (element_mapping['node_list'].shape[1],))  # Fixed-size array for nodes
-            ])
+        Returns
+        -------
+        dict
+            A dictionary containing:
+                - 'NODES': A pandas DataFrame with node information for all selection sets.
+                - 'ELEMENTS': A pandas DataFrame with element information for all selection sets.
 
-            results = np.zeros(len(element_ids_array), dtype=dtype)
+        Raises
+        ------
+        ValueError
+            If `selection_set_ids` is not an integer or a list of integers.
 
-            # Fill results with valid matches
-            if np.any(mask):
-                matched_elements = element_mapping[indices[mask]]
-                results['element_id'][mask] = matched_elements['element_id']
-                results['file_name'][mask] = matched_elements['file_name']
-                results['element_idx'][mask] = matched_elements['element_idx']
-                results['element_type'][mask] = matched_elements['element_type']
-                results['node_list'][mask] = matched_elements['node_list']
+        Examples
+        --------
+        Suppose the selection set contains the following data:
+        
+        >>> self.extract_selection_set_ids(selection_set_ids=[1, 2])
+        Returns:
+            {
+                1: {"NODES": [101, 102], "ELEMENTS": [201, 202]},
+                2: {"NODES": [103, 104], "ELEMENTS": [203, 204]},
+            }
 
-            # Mark unmatched elements as None
-            unmatched_mask = ~mask
-            results['element_id'][unmatched_mask] = element_ids_array[unmatched_mask]
-            results['file_name'][unmatched_mask] = "None"
-            results['element_idx'][unmatched_mask] = -1
-            results['element_type'][unmatched_mask] = "None"
-            results['node_list'][unmatched_mask] = -1
+        Calling the method with multiple selection sets:
+        
+        >>> get_selection_set_nodes_elements([1, 2])
+        Returns:
+            {
+                'NODES': DataFrame with combined node information,
+                'ELEMENTS': DataFrame with combined element information
+            }
+        """
+        # Ensure selection_set_ids is a list
+        if isinstance(selection_set_ids, int):
+            selection_set_ids = [selection_set_ids]
+        elif not isinstance(selection_set_ids, list) or not all(isinstance(id, int) for id in selection_set_ids):
+            raise ValueError("selection_set_ids must be an integer or a list of integers.")
 
-            return results
+        # Initialize sets to collect unique nodes and elements
+        all_nodes = set()
+        all_elements = set()
+
+        # Extract nodes and elements for each selection set
+        for selection_set_id in selection_set_ids:
+            selection_set_dict = self.extract_selection_set_ids(selection_set_ids=[selection_set_id])
+            if selection_set_id not in selection_set_dict:
+                raise ValueError(f"Selection set ID {selection_set_id} not found.")
+            all_nodes.update(selection_set_dict[selection_set_id].get('NODES', []))
+            all_elements.update(selection_set_dict[selection_set_id].get('ELEMENTS', []))
+
+        # Retrieve node and element information
+        nodes_info = self.get_node_files_and_indices(node_ids=list(all_nodes))
+        elements_info = self.get_element_files_and_indices(element_ids=list(all_elements))
+
+        # Combine results into a dictionary
+        result_dict = {
+            'NODES': nodes_info,
+            'ELEMENTS': elements_info
+        }
+
+        return result_dict

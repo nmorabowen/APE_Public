@@ -1,6 +1,7 @@
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 
@@ -9,14 +10,25 @@ class NODES:
     This is a mixin class to be used with the MCPO_VirtualDataset to handle the nodes of the dataset. 
     """
     
-    def _get_all_nodes_ids(self):
+    def _get_all_nodes_ids(self, print_memory=False):
         """
-        Retrieve all unique node IDs, file names, indices, and coordinates from the partition files.
+        Retrieve all node IDs, file names, indices, and coordinates from the partition files.
+
+        This method processes partition files, extracts node IDs and their corresponding coordinates, and returns 
+        the results in both a structured NumPy array and a pandas DataFrame. It also provides an option to print 
+        memory usage for both data representations.
+
+        Args:
+            print_memory (bool): If True, prints the memory usage of the structured array and DataFrame.
 
         Returns:
-            np.ndarray: A structured array with unique node IDs, file names, indices, and individual coordinates (x, y, z).
+            dict: A dictionary containing:
+                - 'array': A structured NumPy array with all node IDs, file names, indices, and coordinates (x, y, z).
+                - 'dataframe': A pandas DataFrame with the same data.
         """
-        node_data = {}
+        import pandas as pd
+
+        node_data = []
 
         for part_number, partition_path in self.results_partitions.items():
             with h5py.File(partition_path, 'r') as partition:
@@ -32,127 +44,37 @@ class NODES:
                         if coord_key in nodes_group:
                             coords = nodes_group[coord_key][...]
                             for index, (node_id, coord) in enumerate(zip(node_ids, coords)):
-                                # Use node_id as a unique key to avoid duplicates
-                                if node_id not in node_data:
-                                    node_data[node_id] = (file_id, index, coord[0], coord[1], coord[2])
+                                node_data.append((node_id, file_id, index, coord[0], coord[1], coord[2]))
 
-        # Convert the dictionary to a structured NumPy array
-        dtype = np.dtype([
+        # Convert the list to a structured NumPy array
+        dtype = [
             ('node_id', 'i8'),
-            ('file_id', 'U50'),
+            ('file_id', 'i8'),
             ('index', 'i8'),
             ('x', 'f8'),
             ('y', 'f8'),
             ('z', 'f8')
-        ])
-
-        # Create the structured array from unique node data
-        unique_nodes = [
-            (node_id, *values) for node_id, values in node_data.items()
         ]
 
-        return np.array(unique_nodes, dtype=dtype)
+        results_array = np.array(node_data, dtype=dtype)
 
+        # Convert to a Pandas DataFrame
+        columns = ['node_id', 'file_id', 'index', 'x', 'y', 'z']
+        df = pd.DataFrame(node_data, columns=columns)
 
-    
-    def get_node_id(self, model_stage, node_ids):
-        """
-        NOTE: UPDATE WITH MAPPING FUNCTION
-        
-        Get node information including indices, file locations, and coordinates for specified node IDs.
-        Parameters
-        ----------
-        model_stage : str
-            The model stage to retrieve node information from
-        node_ids : int or list
-            Single node ID or list of node IDs to look up
-        Returns
-        -------
-        list
-            List of dictionaries containing node information with keys:
-            - 'node_id': Original node ID
-            - 'index': Index position in the dataset
-            - 'file': Source file name
-            - 'coordinates': Node coordinates (if available)
-        Notes
-        -----
-        Uses HDF5 file structure to efficiently lookup node information.
-        Will convert single node_id input to list format internally.
-        Verifies model stage before processing.
-        """
-        # Convert single node_id to list if necessary
-        if not isinstance(node_ids, list):
-            node_ids = [node_ids]
-            
-        # Verify the model stage
-        self._model_stages_error(model_stage=model_stage)
-        
-        """Get nodes' indices, file locations, and coordinates."""
-        with h5py.File(self.virtual_data_set, 'r') as h5file:
-            # Get node index and file
-            base_path = self.MODEL_NODES_PATH.format(model_stage=model_stage)
-            nodes_group = h5file.get(base_path)
-            
-            nodes_info = []
-            
-            # Find node locations
-            for node_id in node_ids:
-                node_info = {'node_id': node_id}
-                
-                for dset_name in nodes_group.keys():
-                    if dset_name.startswith("ID"):
-                        dataset = nodes_group[dset_name]
-                        data = dataset[:]  # Read data once
-                        if node_id in data[:]:
-                            node_info['index'] = np.where(data == node_id)[0][0]
-                            node_info['file'] = dset_name.replace("ID_", "")
-                            # Get coordinates
-                            coord_key = dset_name.replace("ID", "COORDINATES")
-                            if coord_key in nodes_group:
-                                node_info['coordinates'] = nodes_group[coord_key][node_info['index']]
-                            nodes_info.append(node_info)
-                            break
-                        
-            return nodes_info
-    
-    def get_node_coordinates(self, model_stage, node_ids=None):
-        """
-        NOTE: UPDATE WITH MAPPING FUNCTION
-        
-        Retrieve the coordinates of specified node IDs for a given model stage.
-        
-        Args:
-            model_stage (str): Name of the model stage.
-            node_ids (list, optional): List of node IDs to retrieve. If None, retrieves all nodes.
-        
-        Returns:
-            dict: Dictionary containing 'node list' and 'coordinates' as NumPy arrays.
-        """
-        if node_ids is not None and not isinstance(node_ids, list):
-            raise TypeError("node_ids must be a list")
-        
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            nodes_group = results.get(self.MODEL_NODES_PATH.format(model_stage=model_stage))
-            if nodes_group is None:
-                raise ValueError("Nodes group not found in the virtual dataset.")
-            
-            coords, node_list = [], []
-            for key in nodes_group.keys():
-                if key.startswith("ID"):
-                    ids = nodes_group[key][...]
-                    coord_key = key.replace("ID", "COORDINATES")
-                    if coord_key in nodes_group:
-                        coordinates = nodes_group[coord_key][...]
-                        if node_ids is None:
-                            node_list.extend(ids)
-                            coords.extend(coordinates)
-                        else:
-                            id_to_index = {id_: idx for idx, id_ in enumerate(ids)}
-                            for node_id in node_ids:
-                                if node_id in id_to_index:
-                                    node_list.append(node_id)
-                                    coords.append(coordinates[id_to_index[node_id]])
-            return {'node list': np.array(node_list), 'coordinates': np.array(coords)}
+        results_dict = {
+            'array': results_array, 
+            'dataframe': df
+        }
+
+        if print_memory:
+            array_memory = results_array.nbytes
+            df_memory = df.memory_usage(deep=True).sum()
+            print(f"Memory usage for structured array (NODES): {array_memory / 1024**2:.2f} MB")
+            print(f"Memory usage for DataFrame (NODES): {df_memory / 1024**2:.2f} MB")
+
+        return results_dict
+
     
     def _get_nodal_results_mapping(self, model_stage, results_name, node_ids=None, overwrite=False):
         """
@@ -190,6 +112,9 @@ class NODES:
             else:
                 output_group = h5file.create_group(output_group_path)
 
+            for node_id, file_id, node_index, _, _, _ in nodes_info:
+                file_info=self.partition_files[file_id]
+            
             # Loop over partition files
             for part_number, partition_path in self.results_partitions.items():
                 with h5py.File(partition_path, 'r') as partition:
@@ -322,74 +247,146 @@ class NODES:
                 
         return results_data
     
-    def get_nodal_results(self, model_stage, node_ids, results_name):
+    def get_nodal_results(self, model_stage=None, results_name=None, node_ids=None, selection_set_id=None):
         """
-        Get nodal results for a single node ID, list of node IDs, or NumPy array of node IDs.
-        The results are stored in a 3D NumPy array.
-
+        Get nodal results optimized for numerical operations.
+        Returns results as a structured NumPy array or DataFrame for efficient computation.
+        
         Args:
-            model_stage (str): The model stage name.
-            node_ids (int, list, or np.ndarray): Single node ID, a list, or a NumPy array of node IDs.
+            model_stage (str, optional): The model stage name. If None, gets results for all stages.
             results_name (str): The name of the result to retrieve.
+            node_ids (int, list, or np.ndarray, optional): Single node ID, a list, or a NumPy array of node IDs.
+            selection_set_id (int, optional): The ID of the selection set to retrieve nodes from.
 
         Returns:
-            np.ndarray: A 3D NumPy array containing results for all requested nodes.
+            pd.DataFrame: A DataFrame with MultiIndex (stage, node_id, step) if model_stage is None,
+                        or Index (node_id, step) if model_stage is specified.
+                        Columns represent the components of the results.
         """
-        # Convert single integer to a NumPy array
-        if isinstance(node_ids, int):
-            node_ids = np.array([node_ids])
-        # Convert list to NumPy array
-        elif isinstance(node_ids, list):
-            node_ids = np.array(node_ids)
-        # Validate the input
-        if not isinstance(node_ids, np.ndarray) or node_ids.size == 0:
-            raise ValueError("node_ids must be a non-empty NumPy array, list, or a single integer")
+        # Input validation
+        node_ids = self._validate_and_prepare_inputs(
+            model_stage, results_name, node_ids, selection_set_id
+        )
+
+        # If no specific model stage is given, process all stages
+        if model_stage is None:
+            all_results = []
+            for stage in self.model_stages:
+                try:
+                    stage_results = self._get_stage_results(
+                        stage, results_name, node_ids
+                    )
+                    stage_results['stage'] = stage  # Add stage information
+                    all_results.append(stage_results)
+                except Exception as e:
+                    print(f"Warning: Could not retrieve results for stage {stage}: {str(e)}")
+                    continue
+            
+            if not all_results:
+                raise ValueError("No results found for any stage")
+            
+            # Combine all stages into a single DataFrame
+            return pd.concat(all_results, axis=0)
         
-        # Retrieve results for the first node to determine the shape
-        node_zero = node_ids[0]
-        results_data = self._get_nodal_results(model_stage, node_zero, results_name)
-        matrix_shape = results_data.shape
+        # If specific model stage is given, process just that stage
+        return self._get_stage_results(model_stage, results_name, node_ids)
 
-        # Create a 3D array to store results
-        shape = (len(node_ids),) + matrix_shape
-        results_array = np.zeros(shape)
-        results_array[0, :, :] = results_data
-
-        # Retrieve results for the remaining nodes
-        if len(node_ids) > 1:
-            for i in range(1, len(node_ids)):
-                node_id = node_ids[i]
-                results_data = self._get_nodal_results(model_stage, node_id, results_name)
-                results_array[i, :, :] = results_data
-
-        return results_array
-    
-    def get_node_info(self, model_stage, node_id):
-        """
-        NOTE: USELESS DUE TO MAPPING FUNCTION
-        Get node's index, file location, and coordinates."""
+    def _get_stage_results(self, model_stage, results_name, node_ids):
+        """Helper function to get results for a specific model stage."""
+        # Get node files and indices information
+        nodes_info = self.get_node_files_and_indices(node_ids=node_ids)
         
-        with h5py.File(self.virtual_data_set, 'r') as h5file:
-            # Get node index and file
-            base_path = f"{model_stage}/RESULTS/ON_NODES/DISPLACEMENT"
-            nodes_group = h5file.get(base_path)
-            
-            node_info = {'node_id': node_id}
-            
-            # Find node location
-            for dset_name in nodes_group.keys():
-                if dset_name.startswith("ID"):
-                    dataset = nodes_group[dset_name]
-                    if node_id in dataset[:]:
-                        node_info['index'] = np.where(dataset[:] == node_id)[0][0]
-                        node_info['file'] = dset_name.replace("ID_", "")
-                        break
-            
-            # Get coordinates
-            coords = self.get_node_coordinates(model_stage, [node_id])
-            if coords and len(coords['coordinates']) > 0:
-                node_info['coordinates'] = coords['coordinates'][0]
+        # Group nodes by file_id for batch processing
+        file_groups = nodes_info.groupby('file_id')
+        
+        # Base path for results
+        base_path = f"{model_stage}/RESULTS/ON_NODES/{results_name}/DATA"
+        
+        # List to store all results before combining
+        all_results = []
+        
+        # Process each file only once, reading multiple nodes
+        for file_id, group in file_groups:
+            with h5py.File(self.results_partitions[int(file_id)], 'r') as results:
+                data_group = results.get(base_path)
+                if data_group is None:
+                    raise ValueError(f"DATA group not found in path '{base_path}'.")
                 
-            return node_info
+                # Get all step names once
+                step_names = list(data_group.keys())
+                
+                # Pre-fetch all node indices for this file
+                node_indices = group['index'].values
+                file_node_ids = group['node_id'].values
+                
+                # Process all steps
+                for step_idx, step_name in enumerate(step_names):
+                    dataset = data_group[step_name]
+                    # Read all required indices at once
+                    step_data = dataset[node_indices]
+                    
+                    # Create DataFrame for this step
+                    step_df = pd.DataFrame(
+                        step_data,
+                        index=file_node_ids,
+                        columns=[f'component_{i}' for i in range(step_data.shape[1])]
+                    )
+                    step_df['step'] = step_idx
+                    step_df['step_name'] = step_name
+                    step_df['node_id'] = file_node_ids
+                    
+                    all_results.append(step_df)
+        
+        if not all_results:
+            raise ValueError(f"No results found for stage {model_stage}")
+        
+        # Combine all results into a single DataFrame
+        combined_results = pd.concat(all_results, axis=0)
+        
+        # Set up MultiIndex
+        combined_results.set_index(['node_id', 'step'], inplace=True)
+        combined_results.sort_index(inplace=True)
+        
+        return combined_results
+
+    def _validate_and_prepare_inputs(self, model_stage, results_name, node_ids, selection_set_id):
+        """Helper function to validate inputs and prepare node_ids."""
+        # Input validation
+        if node_ids is not None and selection_set_id is not None:
+            raise ValueError("Only one of 'node_ids' or 'selection_set_id' can be provided.")
+        if node_ids is None and selection_set_id is None:
+            raise ValueError("Either 'node_ids' or 'selection_set_id' must be provided.")
+        
+        # Results name validation
+        if results_name not in self.node_results_names:
+            raise ValueError(f"Results name '{results_name}' not found in the dataset.")
+        
+        # Model stage validation (only if specified)
+        if model_stage is not None and model_stage not in self.model_stages:
+            raise ValueError(f"Model stage '{model_stage}' not found in the dataset.")
+        
+        # Handle selection set
+        if selection_set_id is not None:
+            selection_set = self.selection_set[selection_set_id]
+            if not selection_set or "NODES" not in selection_set:
+                raise ValueError(f"Selection set ID '{selection_set_id}' does not contain nodes.")
+            return np.array(selection_set["NODES"])
+        
+        # Handle node_ids
+        if isinstance(node_ids, int):
+            return np.array([node_ids])
+        elif isinstance(node_ids, list):
+            return np.array(node_ids)
+        elif isinstance(node_ids, np.ndarray) and node_ids.size > 0:
+            return node_ids
+        else:
+            raise ValueError("node_ids must be a non-empty NumPy array, list, or a single integer.")
+                
+                
+
+
+
+    
+
 
     

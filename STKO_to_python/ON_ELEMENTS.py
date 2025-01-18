@@ -2,12 +2,13 @@ import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+import pandas as pd
 
 
 class ON_ELEMENTS:
     """This is a mixin class to work with MPCO_VirtualDataset"""
     
-    def _get_all_element_index(self, element_type=None):
+    def _get_all_element_index(self, element_type=None, print_memory=False):
         """
         Fetch information for all elements of a given type in the partition files.
         If no element type is provided, fetch information for all element types.
@@ -15,9 +16,13 @@ class ON_ELEMENTS:
         Args:
             element_type (str or None): The type of elements to fetch (e.g., 'ElasticBeam3d'). 
                                         If None, fetches all element types.
+            print_memory (bool, optional): If True, prints memory usage for the structured array
+                                        and DataFrame. Defaults to False.
 
         Returns:
-            list: A list of dictionaries containing element information.
+            dict: A dictionary containing:
+                - 'array': Structured NumPy array with element data.
+                - 'dataframe': Pandas DataFrame with element data.
         """
         model_stages = self.get_model_stages()
 
@@ -29,9 +34,6 @@ class ON_ELEMENTS:
 
         # List to store all elements' information
         elements_info = []
-
-        # Regular expression to extract `fileXX`
-        file_regex = re.compile(r'file(\d+)')
 
         # Loop through partition files
         for part_number, partition_path in self.results_partitions.items():
@@ -47,7 +49,6 @@ class ON_ELEMENTS:
                     # Loop through each element in the group
                     for element in element_group.keys():
                         element_name = element.split('[')[0]
-                        file_name_match = file_regex.search(element)
                         file_name = part_number
 
                         if element_name == etype:
@@ -59,109 +60,47 @@ class ON_ELEMENTS:
                                 elements_info.append({
                                     'element_id': element_data[0],
                                     'element_idx': idx,
-                                    'node_list': element_data[1:],  # Node data (e.g., coordinates or connectivity)
+                                    'node_list': element_data[1:].tolist(),  # Node connectivity data
                                     'file_name': file_name,
                                     'element_type': etype
                                 })
 
-        return elements_info
+        # Prepare structured array and DataFrame
+        if elements_info:
+            dtype = [
+                ('element_id', int),
+                ('element_idx', int),
+                ('file_name', int),
+                ('element_type', object),
+                ('node_list', object)  # Include node_list as an object field
+            ]
+            structured_data = [
+                (elem['element_id'], elem['element_idx'], elem['file_name'], elem['element_type'], elem['node_list'])
+                for elem in elements_info
+            ]
+            results_array = np.array(structured_data, dtype=dtype)
 
+            # Convert to a Pandas DataFrame
+            df = pd.DataFrame.from_records(elements_info)
 
-    
-    def _get_element_index(self, element_type, element_id):
-        
-        model_stages = self.get_model_stages()
-        # Check for errors in element type and model stage
-        self._element_type_name_error(element_type, model_stages[0])
-        
-        # Get the element index
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            
-            # Get the element group names, ie. ElasticBeam3d, ASDShell, etc
-            element_group = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stages[0], element_type=element_type))
-            
-            if element_group is None:
-                raise ValueError(f"Element type '{element_type}' not found in the virtual dataset.")
-            
-            # Go through the element partitions files fetching for the element id
-            
-            element_info = {
-            'element_id': None,
-            'element_idx': None,
-            'node_coordinates_list': None,
-            'file_name': None
+            # Optionally print memory usage
+            if print_memory:
+                array_memory = results_array.nbytes
+                df_memory = df.memory_usage(deep=True).sum()
+                print(f"Memory usage for structured array (ELEMENTS): {array_memory / 1024**2:.2f} MB")
+                print(f"Memory usage for DataFrame (ELEMENTS): {df_memory / 1024**2:.2f} MB")
+
+            return {
+                'array': results_array,
+                'dataframe': df
             }
-            
-            for element in element_group.keys():
-                # Get the relevant name data
-                element_name = element.split('[')[0]
-                file_name = element.split('file')[1]
-
-                if element_name == element_type:
-                    dataset = element_group[element]
-                    # The dataset is made up of an id and the nodes that make up the element, if it is a beam 2 nodes, a Q4 shell 4 nodes, etc
-                    data = dataset[:]
-                    
-                    if element_id in data[:,0]:
-                        node_idx = np.where(data[:,0]==element_id)[0][0]
-                        element_info['element_id'] = element_id
-                        element_info['element_idx'] = node_idx
-                        element_info['node_coordinates_list'] = data[node_idx,1:]
-                        element_info['file_name'] = '_file'+file_name
-            
-            return element_info
-    
-    def _get_multiple_elements_index(self, element_type, element_ids, model_stage):
-        """
-        Fetch information for multiple elements in a single pass.
-
-        Args:
-            element_type (str): The type of elements to fetch (e.g., 'ElasticBeam3d').
-            element_ids (int, list, or np.ndarray): A single element ID, a list, or a NumPy array of element IDs to retrieve.
-            model_stage (str): The model stage to query.
-
-        Returns:
-            list: A list of dictionaries containing element information for each element ID.
-        """
-        # Normalize element_ids to a list
-        if isinstance(element_ids, (int, np.integer)):
-            element_ids = [element_ids]
-        elif isinstance(element_ids, np.ndarray):
-            element_ids = element_ids.tolist()
-        elif not isinstance(element_ids, list):
-            raise TypeError("element_ids must be an int, list, or np.ndarray.")
-
-        # Check for errors in element type and model stage
-        self._model_stages_error(model_stage)
-        self._element_type_name_error(element_type, model_stage)
-
-        elements_info = []
-        with h5py.File(self.virtual_data_set, 'r') as results:
-            # Get the element group
-            element_group = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=model_stage, element_type=element_type))
-            
-            if element_group is None:
-                raise ValueError(f"Element type '{element_type}' not found in the virtual dataset.")
-            
-            for element in element_group.keys():
-                element_name = element.split('[')[0]
-                file_name = element.split('_file')[1]
-                if element_name == element_type:
-                    dataset = element_group[element]
-                    data = dataset[:]
-                    
-                    # Process all requested element_ids in one go
-                    for element_id in element_ids:
-                        if element_id in data[:, 0]:
-                            node_idx = np.where(data[:, 0] == element_id)[0][0]
-                            elements_info.append({
-                                'element_id': element_id,
-                                'element_idx': node_idx,
-                                'node_coordinates_list': data[node_idx, 1:],
-                                'file_name': '_file' + file_name
-                            })
+        else:
+            print("No elements found.")
+            return {
+                'array': np.array([], dtype=dtype),
+                'dataframe': pd.DataFrame()
+            }
         
-        return elements_info
     
     def get_element_results_for_type_and_id(self, result_name, element_type, element_id, model_stage):
         

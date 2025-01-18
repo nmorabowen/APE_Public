@@ -5,12 +5,7 @@ import os
 
 class CDATA:
     """This is a mixin class to parse through the info contained in a CDATA section."""
-    
-    def _get_cdata_info(self):
 
-        file_list=self._get_file_list(extension='cdata', verbose=False)
-        
-        return file_list
     
     def list_CDATA_files(self):
         """
@@ -20,7 +15,7 @@ class CDATA:
             None
         """
         
-        file_list=self._get_file_list(extension='cdata', verbose=False)
+        file_list=self.file_info_cdata
         for file in file_list.keys():
             print(f'{file}')
     
@@ -35,6 +30,9 @@ class CDATA:
         Returns:
             list: A list of dictionaries containing selection set data.
         """
+        
+        if isinstance(selection_set_ids, (int, float)):
+            selection_set_ids = [selection_set_ids]
         
         if selection_set_ids is not None and not isinstance(selection_set_ids, list):
             raise ValueError("selection_set_ids must be a list of integers or None.")
@@ -97,9 +95,8 @@ class CDATA:
 
         return selection_sets
     
-    def extract_selection_set_ids(self, fileName, selection_set_ids=None):
+    def extract_selection_set_ids(self, selection_set_ids=None):
         """
-        NOTE: THE BASE CLASS SHOULD EVETUALLY POIT TO THE NAME OF THE FILE, NOT THE FILE ITSELF
         
         Aggregates nodes and elements while maintaining the structure of each selection set.
 
@@ -111,23 +108,18 @@ class CDATA:
             dict: A dictionary where each key is a selection set ID, and the value is another dictionary
                 containing 'SET_NAME', 'NODES', and 'ELEMENTS'.
         """
+        if isinstance(selection_set_ids, (int, float)):
+            selection_set_ids = [selection_set_ids]
+        
         if selection_set_ids is not None and not isinstance(selection_set_ids, list):
             raise ValueError("selection_set_ids must be a list of integers or None.")
 
         aggregated_data = {}
 
         # Get the list of `.cdata` files
-        file_mapping = self._get_cdata_info()
-        
-        if fileName not in file_mapping.keys():
-            raise ValueError(
-                f"File name '{fileName}' not found in the file mapping. The name should be one of the following: {list(file_mapping.keys())}"
-            )
+        file_mapping = self.cdata_partitions
 
-        # Get a list of all the file paths
-        file_list = [item['file'] for sublist in file_mapping.values() for item in sublist]
-
-        for file_path in file_list:
+        for id, file_path in file_mapping.items():
             # Extract selection sets for the current file
             selection_sets = self._extract_selection_set_ids_for_file(file_path, selection_set_ids=selection_set_ids)
 

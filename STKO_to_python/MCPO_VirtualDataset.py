@@ -2,7 +2,7 @@ import h5py
 import numpy as np
 import glob  # Import the glob module
 import os
-import yaml
+import pandas as pd
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import concurrent.futures
@@ -30,7 +30,7 @@ class MCPO_VirtualDataset(NODES,
     RESULTS_ON_ELEMENTS_PATH = "/{model_stage}/RESULTS/ON_ELEMENTS"
     RESULTS_ON_NODES_PATH = "/{model_stage}/RESULTS/ON_NODES"
 
-    def __init__(self, results_directory, recorder_name=None, results_directory_name='results_h5', results_filename='results.h5', file_extension='*.mpco'):
+    def __init__(self, results_directory, recorder_name, results_directory_name='results_h5', results_filename='results.h5', file_extension='*.mpco'):
         """
         Initialize the MCPO_VirtualDataset instance.
         
@@ -44,8 +44,13 @@ class MCPO_VirtualDataset(NODES,
         self.file_extension = file_extension
         self.recorder_name = recorder_name
         
+        # Get file list for mpco files and cdata files
+        self.file_info_mpco=self._get_file_list(extension='mpco')
+        self.file_info_cdata=self._get_file_list(extension='cdata')
+        
         # Get the results partitions
         self.results_partitions = self._get_results_partitions()
+        self.cdata_partitions = self._get_cdata_partitions()
         
         # Get model global information
         self.model_stages= self.get_model_stages()
@@ -61,12 +66,24 @@ class MCPO_VirtualDataset(NODES,
         
         # Create the virtual dataset
         self.create_virtual_dataset()
+        
+        # Get node and element information
+        # In order to query the data efficiently, we will store the mappings in a structured numpy array and df
+        # Usually the size of this arrays is not too big, so we can store them in memory, the method contain a print_memory=True statement to check the size of the arrays
+        self.nodes_info=self._get_all_nodes_ids(print_memory=True)
+        self.elements_info=self._get_all_element_index(print_memory=True)
+        
+        # Get number of steps
+        self.number_of_steps=self.get_number_of_steps()
+        
+        # Get the selection sets mapping
+        self.selection_set=self.extract_selection_set_ids()
+        
         self.build_and_store_mappings()
         
 
     
-    
-    
+
     def _define_virtual_paths(self, results_directory_name, results_filename):
         """
         Define paths for the virtual dataset and its directory.
@@ -81,44 +98,17 @@ class MCPO_VirtualDataset(NODES,
         os.makedirs(self.virtual_data_set_directory, exist_ok=True)
     
     def _get_results_partitions(self):
-        """
-        Retrieve a sorted list of partition files matching the specified file extension,
-        and create a dictionary with part numbers as keys and file paths as values.
+        file_info=self.file_info_mpco
+        # Filter by recorder name
+        results_partitions=file_info[self.recorder_name]
+        
+        return results_partitions
 
-        Returns:
-            dict: A dictionary where keys are part numbers and values are file paths.
-        """
-        results_partitions = sorted(glob.glob(f"{self.results_directory}/{self.file_extension}"))
+    def _get_cdata_partitions(self):
+        file_info=self.file_info_cdata
+        # Filter by recorder name
+        results_partitions=file_info[self.recorder_name]
         
-        # Create a dictionary to hold part numbers as keys and file paths as values
-        part_data_dict = {}
-        
-        for partition in results_partitions:
-            # Assuming filenames like 'part-' where XX is the part number
-            match = re.search(r'part-(\d+)', partition)
-            if match:
-                part_number = int(match.group(1))  # Extract part number
-                
-                # Add part number as key and file path as value to the dictionary
-                part_data_dict[part_number] = partition
-        
-        print("Using the following partition files with part numbers:")
-        for part_number, file_path in part_data_dict.items():
-            print(f"{part_number}: {file_path}")
-        
-        return part_data_dict
-    
-    def _get_results_partitions_bak(self):
-        """
-        Retrieve a sorted list of partition files matching the specified file extension.
-        
-        Returns:
-            list: Sorted list of partition file paths.
-        """
-        results_partitions = sorted(glob.glob(f"{self.results_directory}/{self.file_extension}"))
-        print("Using the following partition files:")
-        for partition in results_partitions:
-            print(f"  - {partition}")
         return results_partitions
     
     def create_virtual_dataset(self):
@@ -134,56 +124,6 @@ class MCPO_VirtualDataset(NODES,
         # Create an empty HDF5 file for the virtual dataset
         with h5py.File(self.virtual_data_set, 'w') as virtual_h5:
             print(f"Virtual dataset file created at {self.virtual_data_set}, ready for linking datasets.")
-
-    
-    def create_virtual_dataset_bak(self):
-        """
-        Create or update the virtual dataset by linking datasets from source partition files.
-        """
-        if os.path.exists(self.virtual_data_set):
-            print(f"Virtual dataset already exists at {self.virtual_data_set}. File will be overwritten.")
-            os.remove(self.virtual_data_set)
-        else:
-            print(f"Creating virtual dataset at {self.virtual_data_set}...")
-
-        def copy_structure(source_group, target_group, file_name, file_index):
-            """
-            Recursively copy groups, datasets, and attributes from source files into the virtual dataset.
-            """
-            for key in source_group.keys():
-                item = source_group[key]
-                if isinstance(item, h5py.Group):
-                    # Require group (create only if not exists)
-                    new_group = target_group.require_group(key)
-
-                    # Copy attributes (if not already present)
-                    for attr_name, attr_value in item.attrs.items():
-                        if attr_name not in new_group.attrs:
-                            new_group.attrs[attr_name] = attr_value
-
-                    # Recursive call
-                    copy_structure(item, new_group, file_name, file_index)
-                elif isinstance(item, h5py.Dataset):
-                    # Create or update virtual dataset
-                    dataset_name = f"{key}_file{file_index}"
-                    if dataset_name not in target_group:
-                        vsource = h5py.VirtualSource(file_name, item.name, shape=item.shape)
-                        layout = h5py.VirtualLayout(shape=item.shape, dtype=item.dtype)
-                        layout[:] = vsource
-                        virtual_dataset = target_group.create_virtual_dataset(dataset_name, layout)
-
-                        # Copy attributes
-                        for attr_name, attr_value in item.attrs.items():
-                            virtual_dataset.attrs[attr_name] = attr_value
-
-        # Open the virtual dataset file
-        with h5py.File(self.virtual_data_set, 'a') as results:
-            for i, file in enumerate(self.results_partitions):
-                with h5py.File(file, 'r') as source:
-                    for group_name in source.keys():
-                        copy_structure(source[group_name], results.require_group(group_name), file, i)
-
-        print(f"Virtual dataset successfully created or updated at {self.virtual_data_set}")
         
     def create_reduced_hdf5(self, node_ids, element_ids, output_file):
         """

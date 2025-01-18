@@ -188,7 +188,9 @@ class GetModelInfo:
             raise ValueError(f"No node results found for model stage(s): {', '.join(model_stages)} in the result partitions.")
 
         return list(node_results_names)
-        
+    
+    
+    
     def get_nodes_by_z_coordinate_bak(self, model_stage, z_value, tolerance=1e-6):
         """
         Retrieve all nodes at a specific z-coordinate value within a given tolerance.
@@ -229,7 +231,18 @@ class GetModelInfo:
             verbose (bool, optional): If True, prints the found files. Default is False.
 
         Returns:
-            defaultdict: A dictionary mapping base names to file details including paths and parts.
+            defaultdict: A dictionary mapping base names to a dictionary with part numbers as keys 
+                        and file paths as values. Example:
+                        
+                        {
+                            "base_name_1": {
+                                0: "/path/to/base_name_1.part-0.extension",
+                                1: "/path/to/base_name_1.part-1.extension"
+                            },
+                            "base_name_2": {
+                                0: "/path/to/base_name_2.part-0.extension"
+                            },
+                        }
 
         Raises:
             ValueError: If the extension is not provided or is empty.
@@ -246,39 +259,37 @@ class GetModelInfo:
         
         try:
             # Use glob to find all files with the given extension
-            files = glob.glob(f"{results_directory}/*.{extension}")
+            files = glob.glob(os.path.join(results_directory, f"*.{extension}"))
             
             if not files:
-                raise FileNotFoundError(f"No files with the extension '.{extension}' were found in {results_directory}.")
+                raise FileNotFoundError(
+                    f"No files with the extension '.{extension}' were found in {results_directory}."
+                )
             
-            # Dictionary to store mapping: {base_name: [{'file': ..., 'part': ...}, ...]}
-            file_mapping = defaultdict(list)
+            # Dictionary to store mapping: { base_name: { part_number: file_path, ... } }
+            file_mapping = defaultdict(dict)
             
             for file in files:
-                # Extract the filename without extension
-                base_name = os.path.basename(file)
+                # Extract the filename without directory
+                filename = os.path.basename(file)
                 
-                # Ensure the file has the expected part naming
-                if ".part-" in base_name:
+                # Ensure the file has the expected part naming (e.g., ".part-XX")
+                if ".part-" in filename:
                     try:
-                        name, part = base_name.split(".part-", 1)
-                        part = int(part.split(".")[0])  # Convert part to integer
+                        name, part_str = filename.split(".part-", 1)
+                        part = int(part_str.split(".")[0])  # Extract part number
                         # Add to the mapping
-                        file_mapping[name].append({'file': file, 'name': name, 'part': part})
+                        file_mapping[name][part] = file
                     except (ValueError, IndexError):
                         print(f"Skipping file due to unexpected naming format: {file}")
             
-            # Sort parts for each base name
-            for key in file_mapping:
-                file_mapping[key].sort(key=lambda x: x['part'])
-            
-            # Print the mapping
+            # Optionally print the mapping for debugging
             if verbose:
                 print("\nFound files:")
-                for name, mappings in file_mapping.items():
+                for name, parts in file_mapping.items():
                     print(f"\n{name}:")
-                    for mapping in mappings:
-                        print(f"  File: {mapping['file']}, Part: {mapping['part']}")
+                    for part, path in sorted(parts.items()):
+                        print(f"  Part: {part}, File: {path}")
             
             return file_mapping
 
@@ -342,6 +353,63 @@ class GetModelInfo:
                     crossing_elements.append(element_id)
 
         return crossing_elements
+    
+    def get_number_of_steps(self):
+        """
+        Retrieves and stores the number of steps (datasets) for each model stage 
+        based on available nodal or element results.
+
+        Returns:
+            dict: A dictionary mapping model stages to their respective number of steps.
+        """
+        # Dictionary to store steps for each model stage
+        steps_info = {}
+
+        # Get all model stages
+        model_stages = self.get_model_stages()
+
+        # Iterate through each model stage
+        for stage in model_stages:
+            try:
+                # Try nodal results first
+                nodal_results = self.get_node_results_names(stage)
+                if nodal_results:
+                    # Use the first nodal result to get the step count
+                    results_name = nodal_results[0]
+                    node_partition = self.nodes_info['dataframe']['file_id'][0]  # Get the partition
+                    base_path = f"{stage}/RESULTS/ON_NODES/{results_name}/DATA"
+
+                    with h5py.File(self.results_partitions[int(node_partition)], 'r') as results:
+                        data_group = results.get(base_path)
+                        if data_group is None:
+                            raise ValueError(f"DATA group not found in path '{base_path}'.")
+                        
+                        # Number of datasets directly represents the number of steps
+                        steps_info[stage] = len(data_group)
+                    continue
+
+                # If no nodal results, try element results
+                element_results = self.get_elements_results_names(stage)
+                if element_results:
+                    results_name = element_results[0]
+                    element_types = self.get_element_types(stage, results_name)[results_name]
+                    if element_types:
+                        element_partition = 0  # Adjust if partition handling is needed
+                        base_path = f"{stage}/RESULTS/ON_ELEMENTS/{results_name}/{element_types[0]}/DATA"
+
+                        with h5py.File(self.results_partitions[element_partition], 'r') as results:
+                            data_group = results.get(base_path)
+                            if data_group is None:
+                                raise ValueError(f"DATA group not found in path '{base_path}'.")
+
+                            # Number of datasets directly represents the number of steps
+                            steps_info[stage] = len(data_group)
+
+            except Exception as e:
+                print(f"Error processing model stage '{stage}': {e}")
+                steps_info[stage] = None
+
+        return steps_info
             
 
                     
