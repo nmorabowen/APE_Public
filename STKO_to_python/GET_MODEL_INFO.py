@@ -105,29 +105,34 @@ class GetModelInfo:
 
         element_types_dict = {}
         for stage in model_stages:
-            for _, partition_path in self.results_partitions.items():
+            for partition, partition_path in self.results_partitions.items():
                 with h5py.File(partition_path, 'r') as results:
                     if results_name is None:
-                        results_names = self.get_elements_results_names(stage)
+                        results_names = self.element_results_names
                     else:
                         self._element_results_name_error(results_name, stage)
                         results_names = [results_name]
 
                     for name in results_names:
-                        ele_types = results.get(self.MODEL_ELEMENTS_PATH.format(model_stage=stage))
+                        ele_types = results.get(self.RESULTS_ON_ELEMENTS_PATH.format(model_stage=stage) + f"/{name}")
                         if ele_types is None:
                             raise ValueError(f"Element types group not found for {name} in partition {partition}")
                         if name not in element_types_dict:
                             element_types_dict[name] = []
-                        element_types_dict[name].extend([key.split('[')[0] for key in ele_types.keys()])
+                            element_types_dict[name].extend(list(ele_types.keys()))
 
+        unique_element_types = set()
+        
         # Remove duplicates in the lists of element types
         for name in element_types_dict:
-            element_types_dict[name] = list(set(element_types_dict[name]))
+            unique_element_types.update(element_types_dict[name])
 
         if verbose:
             print(f'The element types found are: {element_types_dict}')
-        return element_types_dict
+            
+        results = {'element_types_dict': element_types_dict, 'unique_element_types': unique_element_types}
+        
+        return results
 
         
     def _get_all_types(self, model_stage=None):

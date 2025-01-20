@@ -56,6 +56,7 @@ class MCPO_VirtualDataset(NODES,
         self.model_stages= self.get_model_stages()
         self.element_results_names=self.get_elements_results_names()
         self.element_types=self.get_element_types()
+        self.unique_element_types=self._get_all_types()
         self.node_results_names=self.get_node_results_names()
         
         # Define the database path and directory

@@ -249,10 +249,13 @@ class ON_ELEMENTS:
         # If specific model stage is given, process just that stage
         return self._get_stage_element_results(model_stage, results_name, element_ids)
 
-    def _get_stage_element_results(self, model_stage, results_name, element_ids):
+    def _get_stage_element_results(self, element_type, model_stage, results_name, element_ids):
         """
         Helper function to get results for a specific model stage.
         """
+        # Check if the element type is valid for the model stage
+        self._element_type_name_error(element_type)
+        
         # Get element files and indices information
         elements_info = self.get_element_files_and_indices(element_ids=element_ids)
 
