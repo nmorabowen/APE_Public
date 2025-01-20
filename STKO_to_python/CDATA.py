@@ -149,4 +149,13 @@ class CDATA:
             aggregated_data[set_id]["ELEMENTS"] = sorted(aggregated_data[set_id]["ELEMENTS"])
 
         return aggregated_data
+    
+    def selection_set_names(self):
+        """
+        Prints the names of all available selection sets.
+        """
+        selection_sets = self.selection_set
+        print('Available selection sets:')
+        for key in selection_sets.keys():
+            print(f'Set id:{key} - Set name: {selection_sets[key]["SET_NAME"]}')
 

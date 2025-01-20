@@ -76,95 +76,6 @@ class NODES:
         return results_dict
 
     
-    def _get_nodal_results_mapping(self, model_stage, results_name, node_ids=None, overwrite=False):
-        """
-        Map nodal results into an HDF5 group for efficient access using batch processing.
-
-        Args:
-            model_stage (str): The model stage name.
-            results_name (str): The name of the results group.
-            node_ids (list, optional): List of node IDs to process. If None, process all nodes.
-            overwrite (bool): If True, overwrite existing data. Defaults to False.
-
-        Returns:
-            None
-        """
-        # Validate and prepare inputs
-        node_ids = self._validate_and_prepare_inputs(
-            model_stage, results_name, node_ids, None
-        )
-
-        # Get node files and indices information
-        nodes_info = self.get_node_files_and_indices(node_ids=node_ids)
-        
-        # Group nodes by file_id for batch processing
-        file_groups = nodes_info.groupby('file_id')
-        
-        # Open the HDF5 file
-        with h5py.File(self.virtual_data_set, 'a') as h5file:
-            # Create or retrieve the output group
-            output_group_path = f"/TH/{model_stage}/{results_name}"
-            if output_group_path in h5file:
-                output_group = h5file[output_group_path]
-            else:
-                output_group = h5file.create_group(output_group_path)
-
-            # Process each file only once, reading multiple nodes
-            for file_id, group in file_groups:
-                base_path = self.RESULTS_ON_NODES_PATH.format(
-                    model_stage=model_stage
-                ) + f"/{results_name}/DATA"
-                
-                with h5py.File(self.results_partitions[int(file_id)], 'r') as partition:
-                    data_group = partition.get(base_path)
-                    if data_group is None:
-                        print(f"The path '{base_path}' does not exist in partition {file_id}. Skipping.")
-                        continue
-
-                    # Get all steps for this file
-                    all_steps = list(data_group.keys())
-                    step_numbers = [int(step.split("_")[1]) for step in all_steps]
-                    sorted_indices = np.argsort(step_numbers)
-                    sorted_steps = [all_steps[i] for i in sorted_indices]
-
-                    if not sorted_steps:
-                        continue
-
-                    # Get shape information from first dataset
-                    first_dataset = data_group[sorted_steps[0]]
-                    num_components = first_dataset.shape[1] if len(first_dataset.shape) > 1 else 1
-                    
-                    # Process each node in the group
-                    for _, node_row in group.iterrows():
-                        node_id = node_row['node_id']
-                        node_index = node_row['index']
-                        
-                        # Check if dataset exists and handle overwrite
-                        node_dataset_path = f"{output_group_path}/Node_{node_id}"
-                        if node_dataset_path in h5file:
-                            if overwrite:
-                                del h5file[node_dataset_path]
-                            else:
-                                print(f"Dataset for Node {node_id} already exists. Skipping.")
-                                continue
-
-                        # Create dataset for this node
-                        node_dataset = output_group.create_dataset(
-                            f"Node_{node_id}",
-                            shape=(len(sorted_steps), 1 + num_components),
-                            dtype=first_dataset.dtype
-                        )
-
-                        # Populate the dataset
-                        for step_idx, step_name in enumerate(sorted_steps):
-                            step_num = int(step_name.split("_")[1])
-                            result_data = data_group[step_name][node_index]
-                            node_dataset[step_idx, 0] = step_num
-                            node_dataset[step_idx, 1:] = result_data
-
-            print(f"Results mapped to group '{output_group_path}' in the HDF5 file.")
-
-    
     def get_nodal_results(self, model_stage=None, results_name=None, node_ids=None, selection_set_id=None):
         """
         Get nodal results optimized for numerical operations.
@@ -247,10 +158,10 @@ class NODES:
                     step_df = pd.DataFrame(
                         step_data,
                         index=file_node_ids,
-                        columns=[f'component_{i}' for i in range(step_data.shape[1])]
+                        columns=[f'{i+1}' for i in range(step_data.shape[1])]
                     )
                     step_df['step'] = step_idx
-                    step_df['step_name'] = step_name
+                    #step_df['step_name'] = step_name
                     step_df['node_id'] = file_node_ids
                     
                     all_results.append(step_df)
