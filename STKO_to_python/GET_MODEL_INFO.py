@@ -4,6 +4,7 @@ from collections import defaultdict
 import os
 import glob
 import re
+import pandas as pd
 
 
 class GetModelInfo:
@@ -415,6 +416,134 @@ class GetModelInfo:
                 steps_info[stage] = None
 
         return steps_info
+    
+    def _get_time_series_ON_NODES_for_stage(self, model_stage, results_name):
+        """
+        Retrieve and consolidate the unique time series data across all partitions 
+        for a given model stage and nodal results name, returning a Pandas DataFrame.
+
+        Args:
+            model_stage (str): The model stage to query.
+            results_name (str): The nodal results name to query.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns ['STEP', 'TIME'], sorted by STEP.
+        """
+
+        time_series_dict = {}  # Dictionary to store STEP -> TIME mapping
+
+        for part_number, partition_path in self.results_partitions.items():
+            try:
+                with h5py.File(partition_path, 'r') as partition:
+                    base_path = f"{model_stage}/RESULTS/ON_NODES/{results_name}/DATA"
+                    data_group = partition.get(base_path)
+
+                    if data_group is None:
+                        continue  # Skip if data does not exist
+
+                    # Iterate over all steps and collect STEP & TIME attributes
+                    for step_name in data_group.keys():
+                        step_group = data_group[step_name]
+                        step_value = step_group.attrs.get("STEP")
+                        time_value = step_group.attrs.get("TIME")
+
+                        if step_value is not None and time_value is not None:
+                            time_series_dict[int(step_value)] = float(time_value)  # Store STEP -> TIME mapping
+
+            except Exception as e:
+                print(f"Error processing partition {part_number}: {e}")
+
+        # Convert to DataFrame
+        df = pd.DataFrame(list(time_series_dict.items()), columns=['STEP', 'TIME']).sort_values(by='STEP')
+
+        return df
+
+    def _get_time_series_ON_ELEMENTS_for_stage(self, model_stage, results_name, element_type):
+        """
+        Retrieve and consolidate the unique time series data across all partitions 
+        for a given model stage, element results name, and specific element type, 
+        returning a Pandas DataFrame.
+
+        Args:
+            model_stage (str): The model stage to query.
+            results_name (str): The element results name to query (e.g., 'force', 'deformation').
+            element_type (str): The specific element type to query (e.g., '203-ASDShellQ4').
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns ['STEP', 'TIME'], sorted by STEP.
+        """
+
+        time_series_dict = {}  # Dictionary to store STEP -> TIME mapping
+
+        for part_number, partition_path in self.results_partitions.items():
+            try:
+                with h5py.File(partition_path, 'r') as partition:
+                    base_path = f"{model_stage}/RESULTS/ON_ELEMENTS/{results_name}/{element_type}/DATA"
+                    data_group = partition.get(base_path)
+
+                    if data_group is None:
+                        continue  # Skip if DATA does not exist
+
+                    # Iterate over all steps and collect STEP & TIME attributes
+                    for step_name in data_group.keys():
+                        step_group = data_group[step_name]
+                        step_value = step_group.attrs.get("STEP")
+                        time_value = step_group.attrs.get("TIME")
+
+                        if step_value is not None and time_value is not None:
+                            time_series_dict[int(step_value)] = float(time_value)  # Store STEP -> TIME mapping
+
+            except Exception as e:
+                print(f"Error processing partition {part_number}: {e}")
+
+        # Convert to DataFrame
+        df = pd.DataFrame(list(time_series_dict.items()), columns=['STEP', 'TIME']).sort_values(by='STEP')
+
+        return df
+    
+    def get_time_series(self):
+        """
+        Retrieve and consolidate the unique time series data across all model stages,
+        storing them in a MultiIndex Pandas DataFrame.
+
+        Returns:
+            pd.DataFrame: A MultiIndex DataFrame with index ['MODEL_STAGE', 'STEP'] 
+                        and column ['TIME'], sorted by MODEL_STAGE and STEP.
+        """
+
+        model_stages = self.model_stages  # Get all model stages
+        model_elements_types = self.element_types['element_types_dict']  # Result name -> Element types
+
+        all_time_series = []  # List to store results for all model stages
+
+        for model_stage in model_stages:
+            time_series_df = None  # Initialize per-stage DataFrame
+
+            # Check if nodal results exist
+            if self.node_results_names is not None:
+                # Get the time series from nodes
+                time_series_df = self._get_time_series_ON_NODES_for_stage(model_stage, self.node_results_names[0])
+            
+            elif self.element_results_names is not None:
+                # Find the first valid element result
+                for result, element_list in model_elements_types.items():
+                    if result is not None and element_list:
+                        element_type = element_list[0]  # Use the first element type
+                        time_series_df = self._get_time_series_ON_ELEMENTS_for_stage(model_stage, result, element_type)
+                        break
+
+            if time_series_df is not None:
+                # Add MODEL_STAGE as a new column
+                time_series_df["MODEL_STAGE"] = model_stage
+                all_time_series.append(time_series_df)
+
+            else:
+                raise ValueError(f"No nodal or element results found for model stage: {model_stage}")
+
+        # Concatenate all time series DataFrames and set MultiIndex
+        final_df = pd.concat(all_time_series).set_index(["MODEL_STAGE", "STEP"]).sort_index()
+
+        return final_df
             
 
                     

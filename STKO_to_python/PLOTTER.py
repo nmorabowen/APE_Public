@@ -203,23 +203,28 @@ class plotter:
         self._nodal_results_name_error(results_name_horizontalAxis, model_stage)
         
 
-        # Retrieve results for vertical and horizontal axes
+        # Retrieve results for vertical
         vertical_results_df = self.get_nodal_results(
             model_stage=model_stage,
             results_name=results_name_verticalAxis,
             node_ids=node_ids_verticalAxis,
             selection_set_id=selection_set_id_verticalAxis,
         )
+        # Aggregate results
+        y_array = plotter._aggregate_results(vertical_results_df, direction_verticalAxis, values_operation_verticalAxis) * scaling_factor_verticalAxis
+        
+        # Retrieve results for horizontal axes
         horizontal_results_df = self.get_nodal_results(
             model_stage=model_stage,
             results_name=results_name_horizontalAxis,
             node_ids=node_ids_horizontalAxis,
             selection_set_id=selection_set_id_horizontallAxis,
         )
-
         # Aggregate results
         x_array = plotter._aggregate_results(horizontal_results_df, direction_horizontalAxis, values_operation_horizontalAxis) * scaling_factor_horizontalAxis
-        y_array = plotter._aggregate_results(vertical_results_df, direction_verticalAxis, values_operation_verticalAxis) * scaling_factor_verticalAxis
+
+
+
 
         if len(x_array) != len(y_array):
             raise ValueError("Mismatch in lengths of horizontal and vertical data arrays.")

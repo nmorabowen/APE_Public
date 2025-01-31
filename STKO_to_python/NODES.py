@@ -26,7 +26,6 @@ class NODES:
                 - 'array': A structured NumPy array with all node IDs, file names, indices, and coordinates (x, y, z).
                 - 'dataframe': A pandas DataFrame with the same data.
         """
-        import pandas as pd
 
         node_data = []
 
@@ -158,7 +157,7 @@ class NODES:
                     step_df = pd.DataFrame(
                         step_data,
                         index=file_node_ids,
-                        columns=[f'{i+1}' for i in range(step_data.shape[1])]
+                        columns=[i + 1 for i in range(step_data.shape[1])]
                     )
                     step_df['step'] = step_idx
                     #step_df['step_name'] = step_name

@@ -57,7 +57,11 @@ class MCPO_VirtualDataset(NODES,
         self.element_results_names=self.get_elements_results_names()
         self.element_types=self.get_element_types()
         self.unique_element_types=self._get_all_types()
+        
         self.node_results_names=self.get_node_results_names()
+        
+        # Get model time series and steps info
+        self.time=self.get_time_series()
         
         # Define the database path and directory
         self._define_virtual_paths(results_directory_name=results_directory_name, results_filename=results_filename)
@@ -81,6 +85,9 @@ class MCPO_VirtualDataset(NODES,
         self.selection_set=self.extract_selection_set_ids()
         
         self.build_and_store_mappings()
+        
+        # Print summary
+        self._print_summary()
         
 
     
@@ -125,7 +132,46 @@ class MCPO_VirtualDataset(NODES,
         # Create an empty HDF5 file for the virtual dataset
         with h5py.File(self.virtual_data_set, 'w') as virtual_h5:
             print(f"Virtual dataset file created at {self.virtual_data_set}, ready for linking datasets.")
+    
+    def _print_summary(self):
+        """
+        Print a summary of the virtual dataset.
+        ---------------------------------------
+        """
+        print(f'File name: {self.virtual_data_set}')
+        print(f"Virtual dataset created at {self.virtual_data_set}")
+        print(f'Number of partitions: {len(self.results_partitions)}')
         
+        print('------------------------------------------------------')
+        
+        print(f"Number of model stages: {len(self.model_stages)}")
+        print(f'Model stages: {self.model_stages}')
+        for stage in self.model_stages:
+            print(f"  - {stage}")
+            
+        print('------------------------------------------------------')
+        print(f'Number of nodal results: {len(self.node_results_names)}')
+        for name in self.node_results_names:
+            print(f"  - {name}")
+            
+        print('------------------------------------------------------')
+        print(f'Number of element results: {len(self.element_results_names)}')
+        for name in self.element_results_names:
+            print(f"  - {name}")
+        print(f'Number of unique element types: {len(self.unique_element_types)}')
+        for name in self.unique_element_types:
+            print(f"  - {name}")
+        
+        print('------------------------------------------------------')
+        print('General model information:')
+        
+        print(f"Number of nodes: {len(self.nodes_info)}")
+        print(f"Number of element types: {len(self.unique_element_types)}")
+        print(f"Number of elements: {len(self.elements_info)}")
+        print(f"Number of steps: {self.number_of_steps}")
+        print(f"Number of selection sets: {len(self.selection_set)}")
+
+    
     def create_reduced_hdf5(self, node_ids, element_ids, output_file):
         """
         Create a reduced HDF5 file containing only the specified nodes and elements with their attributes.
