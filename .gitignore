@@ -46,3 +46,7 @@ APE_Public.egg-info/dependency_links.txt
 APE_Public.egg-info/SOURCES.txt
 APE_Public.egg-info/top_level.txt
 plotApeConfig/__pycache__/__init__.cpython-312.pyc
+/gmshtools/__pycache__
+/ModuleFE/__pycache__
+/plotApeConfig/__pycache__
+/APE_Public.egg-info

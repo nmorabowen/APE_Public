@@ -1,1 +1,1 @@
-from .ConstitutiveRelationships import *
+from .Earthquake import Earthquake
