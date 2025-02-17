@@ -35,8 +35,10 @@ ModuleFE/Truss2D.py
 ModuleFE/__init__.py
 NCH/__init__.py
 NCH/designSpectra.py
+STKO_to_python/CDATA.py
 STKO_to_python/ERRORS.py
 STKO_to_python/GET_MODEL_INFO.py
+STKO_to_python/MAPPING.py
 STKO_to_python/MCPO_VirtualDataset.py
 STKO_to_python/NODES.py
 STKO_to_python/ON_ELEMENTS.py

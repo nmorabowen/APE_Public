@@ -171,6 +171,14 @@ class MCPO_VirtualDataset(NODES,
         print(f"Number of steps: {self.number_of_steps}")
         print(f"Number of selection sets: {len(self.selection_set)}")
 
+    def print_selection_set_info(self):
+        """Method to print the selection set information.
+        """
+        
+        for key in self.selection_set.keys():
+            print(f"Selection set: {key}")
+            print(f"Selection Set name: {self.selection_set[key]['SET_NAME']}")
+            print('------------------------------------------------------')
     
     def create_reduced_hdf5(self, node_ids, element_ids, output_file):
         """
