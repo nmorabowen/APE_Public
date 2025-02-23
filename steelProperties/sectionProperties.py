@@ -26,7 +26,7 @@ class WSection:
     ----------
     - bf (float): Flange width (mm).
     - tf (float): Flange thickness (mm).
-    - h (float): Total height of the section (mm).
+    - h (float): Height of the web section (mm).
     - tw (float): Web thickness (mm).
     - material (Material): Material properties of the section.
 
@@ -174,6 +174,12 @@ class WSection:
         print(f"Centroid of Half the Beam (x_cm): {np.round(self.x_cm, 3)}")
         print(f"Plastic Section Modulus in the weak axis (Zy): {np.round(self.Zy, 3)}")
 
+class panelZone:
+    def __init__(self, beamObject, columnObject):
+        self.beam=beamObject
+        self.column=columnObject
+        
+    
 
 if __name__ == "__main__":
     # Define material properties (example values)
@@ -193,4 +199,6 @@ if __name__ == "__main__":
     Pu = 100000  # Example axial load in N
     Mn = W1.calculate_nominal_moment_capacity(Pu)
     print(f"Nominal Moment Capacity (Mn) with Pu={Pu}: {np.round(Mn, 3)}")
+
+
 
