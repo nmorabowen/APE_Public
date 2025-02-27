@@ -39,12 +39,20 @@ class WSection:
     - calculate_expected_moment_capacity(): Calculates the expected moment capacity (Mpr).
     - calculate_nominal_moment_capacity(Pu): Calculates the nominal moment capacity (Mn) considering axial load (Pu).
     """
-    def __init__(self, bf, tf, h, tw, material):
+    def __init__(self, bf, tf, h, tw, material, units=None):
         self.bf = bf       # Flange width
         self.tf = tf       # Flange thickness
         self.h = h         # Total height
         self.tw = tw       # Web thickness
         self.material = material
+        
+        if units is None:
+            self.units={'length':1,
+                        'force':1}
+        elif not isinstance(units, dict):
+            raise ValueError('Units must be a dictionary')
+        else:
+            self.units=units
 
         # Calculated properties
         self.Ag = self.area()
@@ -126,7 +134,7 @@ class WSection:
         Mpr = Ry * Fy * Zx
         
         if verbose is True:
-            print(f'Beam expected moment capacity is: {np.round(Mpr,1)}')
+            print(f'Beam expected moment capacity is: {np.round(Mpr/(self.units['force']*self.units['length']),1)}')
         
         return Mpr
 
@@ -160,24 +168,57 @@ class WSection:
         Prints a summary of the W-section properties.
         """
         print("WSection Properties:")
-        print(f"Gross Area (Ag): {np.round(self.Ag, 3)}")
+        print(f"Gross Area (Ag): {np.round(self.Ag/(self.units['lenght'])**2, 3)}")
         
-        print(f'Moment of inercia in the strong axis is: {np.round(self.Ix,0)}')
-        print(f'Moment of inercia in the weak axis is: {np.round(self.Iy,0)}')
+        print(f'Moment of inercia in the strong axis is: {np.round(self.Ix/(self.units['length'])**4,0)}')
+        print(f'Moment of inercia in the weak axis is: {np.round(self.Iy/(self.units['length'])**4,0)}')
         
-        print(f'Section Modulus in the strong axis (Sx): {np.round(self.Sx,0)}')
-        print(f'Section Modulus in the weak axis (Sy) : {np.round(self.Sy,0)}')
+        print(f'Section Modulus in the strong axis (Sx): {np.round(self.Sx/(self.units['length'])**3,0)}')
+        print(f'Section Modulus in the weak axis (Sy) : {np.round(self.Sy/(self.units['length'])**3,0)}')
         
-        print(f"Centroid of Half the Beam (y_cm): {np.round(self.y_cm, 3)}")
-        print(f"Plastic Section Modulus in the strong axis (Zx): {np.round(self.Zx, 3)}")
+        print(f"Centroid of Half the Beam (y_cm): {np.round(self.y_cm/(self.units['length']), 3)}")
+        print(f"Plastic Section Modulus in the strong axis (Zx): {np.round(self.Zx/(self.units['length'])**3, 3)}")
         
-        print(f"Centroid of Half the Beam (x_cm): {np.round(self.x_cm, 3)}")
-        print(f"Plastic Section Modulus in the weak axis (Zy): {np.round(self.Zy, 3)}")
+        print(f"Centroid of Half the Beam (x_cm): {np.round(self.x_cm/(self.units['length']), 3)}")
+        print(f"Plastic Section Modulus in the weak axis (Zy): {np.round(self.Zy/(self.units['length'])**3, 3)}")
 
 class panelZone:
-    def __init__(self, beamObject, columnObject):
+    def __init__(self, beamObject, columnObject, units=None):
         self.beam=beamObject
         self.column=columnObject
+        
+        if units is None:
+            self.units={'length':1,
+                        'force':1}  
+        elif not isinstance(units, dict):
+            raise ValueError('Units must be a dictionary')
+        else:
+            self.units=units
+        
+    def _tensionCapacity(self):
+        
+        # Calculate minimum thickness required by code
+        tcf_limit=[]
+        tcf_limit.append(self.beam.bf/6)
+        tcf_limit.append(0.40*(1.80*self.beam.bf*self.beam.tf*(self.beam.material.Fy*self.beam.material.Ry)/(self.column.material.Fy*self.column.material.Ry))**0.5)
+        
+        # Set the units
+        tcf_limit=tcf_limit
+        
+        # Calculate the demand and capacity
+        phiRn=0.90*(6.25*self.column.tf**2*self.column.material.Fy*self.column.material.Ry)
+        Tu=1.80*self.beam.bf*self.beam.tf*self.beam.material.Fy*self.beam.material.Ry
+        
+        ratio=Tu/phiRn
+        
+        results={'tcf_limit':tcf_limit, 'phiRn':phiRn, 'Tu':Tu, 'ratio':ratio}
+        
+        print(f'The minimum thickness to avoid tension flange rupture is: {np.round(tcf_limit[0],2)}')
+        print(f'The column flange capacity is: {np.round(phiRn,2)}')
+        print(f'The beam flange demand is: {np.round(Tu,2)}')
+        print(f'The ratio between demand and capacity is: {np.round(ratio,2)}')
+        
+        return results
         
     
 
