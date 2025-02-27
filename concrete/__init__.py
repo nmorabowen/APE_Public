@@ -1,1 +1,1 @@
-from .concreteBasic import ColumnRectangular, BeamSimple, As, Calculo_Ratio, rho_table, 
+from .concreteBasic import ColumnRectangular, BeamSimple, As, Calculo_Ratio, rho_table
