@@ -170,11 +170,11 @@ class WSection:
         print("WSection Properties:")
         print(f"Gross Area (Ag): {np.round(self.Ag/(self.units['lenght'])**2, 3)}")
         
-        print(f'Moment of inercia in the strong axis is: {np.round(self.Ix/(self.units['length'])**4,0)}')
-        print(f'Moment of inercia in the weak axis is: {np.round(self.Iy/(self.units['length'])**4,0)}')
+        print(f"Moment of inercia in the strong axis is: {np.round(self.Ix/(self.units['length'])**4,0)}")
+        print(f"Moment of inercia in the weak axis is: {np.round(self.Iy/(self.units['length'])**4,0)}")
         
-        print(f'Section Modulus in the strong axis (Sx): {np.round(self.Sx/(self.units['length'])**3,0)}')
-        print(f'Section Modulus in the weak axis (Sy) : {np.round(self.Sy/(self.units['length'])**3,0)}')
+        print(f"Section Modulus in the strong axis (Sx): {np.round(self.Sx/(self.units['length'])**3,0)}")
+        print(f"Section Modulus in the weak axis (Sy) : {np.round(self.Sy/(self.units['length'])**3,0)}")
         
         print(f"Centroid of Half the Beam (y_cm): {np.round(self.y_cm/(self.units['length']), 3)}")
         print(f"Plastic Section Modulus in the strong axis (Zx): {np.round(self.Zx/(self.units['length'])**3, 3)}")
