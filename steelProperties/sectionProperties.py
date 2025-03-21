@@ -134,7 +134,7 @@ class WSection:
         Mpr = Ry * Fy * Zx
         
         if verbose is True:
-            print(f'Beam expected moment capacity is: {np.round(Mpr/(self.units['force']*self.units['length']),1)}')
+            print(f"Beam expected moment capacity is: {np.round(Mpr/(self.units['force']*self.units['length']),1)}")
         
         return Mpr
 
