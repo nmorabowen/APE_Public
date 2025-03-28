@@ -30,7 +30,13 @@ class MCPO_VirtualDataset(NODES,
     RESULTS_ON_ELEMENTS_PATH = "/{model_stage}/RESULTS/ON_ELEMENTS"
     RESULTS_ON_NODES_PATH = "/{model_stage}/RESULTS/ON_NODES"
 
-    def __init__(self, results_directory, recorder_name, results_directory_name='results_h5', results_filename='results.h5', file_extension='*.mpco'):
+    def __init__(self, 
+                 results_directory:str, 
+                 recorder_name:str,
+                 results_directory_name='results_h5', #OLD must be removed
+                 results_filename='results.h5', #OLD must be removed
+                 file_extension='*.mpco',
+                 print_summary=False):
         """
         Initialize the MCPO_VirtualDataset instance.
         
@@ -87,8 +93,9 @@ class MCPO_VirtualDataset(NODES,
         self.build_and_store_mappings()
         
         # Print summary
-        self._print_summary()
-        
+        if print_summary:
+            self._print_summary()
+            
 
     
 
