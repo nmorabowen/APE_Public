@@ -5,11 +5,16 @@ from scipy.integrate import cumulative_trapezoid
 
 
 class Earthquake:
-    def __init__(self, filepath, dt, units=None):
+    def __init__(self, dt:float, filepath:str=None, data_array:np.ndarray=None, units:dict=None):
+        
+        # Error control for input data
+        if filepath is None and data_array is None:
+            raise ValueError("Either 'filepath' or 'data_array' must be provided.")
+        
         # Default unit system
         default_units = {
-            'length': {'factor': 1, 'label': 'm'},  # Default: meters
-            'time': {'factor': 1, 'label': 's'}     # Default: seconds
+            'length': {'factor': 1, 'label': None},
+            'time': {'factor': 1, 'label': None}    
         }
         
         # Merge user-defined units with defaults
@@ -17,12 +22,17 @@ class Earthquake:
 
         self.filepath = filepath
         self.dt = dt
+        self.data_array = data_array
+        
         self.record_results = self.read_data()
         
     def read_data(self):
-        # Load the acceleration data from file
-        acceleration = np.loadtxt(self.filepath, skiprows=0)
-
+        if self.filepath is not None:
+            # Load the acceleration data from file
+            acceleration = np.loadtxt(self.filepath, skiprows=0)
+        else:
+            acceleration=np.asarray(self.data_array) #enforce array type
+            
         # Determine the number of data points
         N = len(acceleration)
         
@@ -35,8 +45,10 @@ class Earthquake:
         
         # Compute velocity and displacement using trapezoidal integration
         acceleration = acceleration * (length_factor / time_factor**2)
-        velocity = np.concatenate(([0], cumulative_trapezoid(acceleration, time))) 
-        displacement = np.concatenate(([0], cumulative_trapezoid(velocity, time))) 
+        # Integrate acceleration → velocity
+        velocity = cumulative_trapezoid(acceleration, dx=self.dt, initial=0)
+        # Integrate velocity → displacement
+        displacement = cumulative_trapezoid(velocity, dx=self.dt, initial=0)
 
         # Find indices for max and min values for each signal
         accel_max_index = np.argmax(acceleration)
@@ -225,7 +237,6 @@ class Earthquake:
         
         return results
 
-
     def plot_response_spectrum(self, spectrum_results, ax=None, figsize=(5, 10), linewidth=0.75, linestyle='-'):
         """
         Plot the response spectrum using three subplots with correct unit labels.
@@ -273,9 +284,7 @@ class Earthquake:
         plt.tight_layout()
         plt.show()
         return ax
-
-
-    
+   
     def _plot_sdof_response(self, u, udot, uacc, time, ax=None, figsize=(10,6), linewidth=0.75, linestyle='-', color=['k', 'b', 'r']):
         """Plots SDOF responses (displacement, velocity, acceleration) with correct unit labels."""
         
@@ -330,7 +339,7 @@ class Earthquake:
 
         # Define unit labels for each quantity
         unit_labels = {
-            'acceleration': 'm/s²',  # Acceleration remains in m/s²
+            'acceleration': f'{length_unit}/{time_unit}²',
             'velocity': f'{length_unit}/{time_unit}',
             'displacement': f'{length_unit}'
         }
