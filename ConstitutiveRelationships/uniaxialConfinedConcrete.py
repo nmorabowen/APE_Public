@@ -442,6 +442,17 @@ class uniaxialConfinedConcrete:
         
         except Exception as e:
             print(f"Error plotting constitutive law: {e}")
+            
+    def print_results(self):
+        """
+        Print the results of the calculations.
+        """
+        try:
+            print(f"Results for {self.name}:")
+            for key, value in self.result.items():
+                print(f"{key}: {value}")
+        except Exception as e:
+            print(f"Error printing results: {e}")
 
 if __name__ == "__main__":
     from baseUnits import kgf, cm, mm
