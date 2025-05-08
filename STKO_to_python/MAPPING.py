@@ -22,8 +22,9 @@ class MAPPING:
             # Save datasets
             mapping_group.create_dataset("Nodes", data=nodes_array)
             #mapping_group.create_dataset("Elements", data=element_array)
-            node_lists = element_array.pop('node_list')  # remove node_list, but keep index alignment
-            element_array.to_hdf(self.virtual_data_set, key="Elements", mode="a", format="table", data_columns=True)  
+            
+        node_lists = element_array.pop('node_list')  # remove node_list, but keep index alignment
+        element_array.to_hdf(self.virtual_data_set, key="Elements", mode="a", format="table", data_columns=True)  
 
     def get_node_files_and_indices(self, node_ids):
         """
