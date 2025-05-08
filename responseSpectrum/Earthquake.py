@@ -14,7 +14,8 @@ class Earthquake:
         # Default unit system
         default_units = {
             'length': {'factor': 1, 'label': None},
-            'time': {'factor': 1, 'label': None}    
+            'time': {'factor': 1, 'label': None},
+            'acceleration': {'factor': 1, 'label': None},
         }
         
         # Merge user-defined units with defaults
@@ -336,10 +337,11 @@ class Earthquake:
         # Get unit factors and labels
         length_unit = self.units['length']['label']
         time_unit = self.units['time']['label']
+        accel_units = self.units['acceleration']['label']
 
         # Define unit labels for each quantity
         unit_labels = {
-            'acceleration': f'{length_unit}/{time_unit}²',
+            'acceleration': accel_units['label'],
             'velocity': f'{length_unit}/{time_unit}',
             'displacement': f'{length_unit}'
         }
@@ -398,3 +400,5 @@ class Earthquake:
         plt.show()
 
         return fig, ax
+    
+

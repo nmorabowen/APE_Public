@@ -386,7 +386,7 @@ class NCh433:
         
         return elastic_spectra
     
-    def plot_spectral_acceleration(self, ax=None, marker=None):
+    def plot_spectral_acceleration(self, ax=None, marker=None, linestyle='-', linewidth=1.5, label=None):
 
         T=self.elastic_spectra['T']
         Sa=self.elastic_spectra['Sa']
@@ -394,15 +394,18 @@ class NCh433:
         if ax is None:
             fig, ax = plt.subplots(figsize=(10,5))
 
-        ax.plot(T, Sa, color=blueAPE, linewidth=1.5, marker=marker)
-        ax.grid(True)
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
-        ax.set_xlabel('Period (T)')
-        ax.set_ylabel('Spectral Acceleration (Sa)')
-        plt.show()
+            ax.plot(T, Sa, color=blueAPE, linewidth=linewidth, marker=marker, linestyle=linestyle, label=label)
+            ax.grid(True)
+            ax.set_xlim(left=0)
+            ax.set_ylim(bottom=0)
+            ax.set_xlabel('Period (T)')
+            ax.set_ylabel('Spectral Acceleration (Sa)')
+            plt.show()
+            
+        else:
+            ax.plot(T, Sa, color=blueAPE, linewidth=linewidth, marker=marker, linestyle=linestyle, label=label)
         
-    def plot_inelastic_spectral_acceleration(self, R_mod, ax=None, marker=None):
+    def plot_inelastic_spectral_acceleration(self, R_mod, ax=None, marker=None, linestyle='-', linewidth=1.5, label=None):
         T = self.elastic_spectra['T']
         Sa = self.elastic_spectra['Sa']
         Sa_reduced = self.elastic_spectra['Sa'] / R_mod
@@ -420,32 +423,42 @@ class NCh433:
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 5))
 
-        ax.plot(T, Sa, color=blueAPE, linewidth=1.5, marker=marker, label='Elastic Spectrum')
-        ax.plot(T, Sa_reduced, color='k', linewidth=1.5, marker=marker, label='Reduced Spectrum')
-        
-        # Horizontal line for Sa_lim
-        ax.axhline(y=Sa_lim, color='r', linestyle='--', linewidth=1.5, label='Sa Limit')
-        
-        # Plot intersection point
-        ax.plot(intersection_T, intersection_Sa, 'ro', markersize=8)
-        
-        # Add text annotation for intersection point
-        ax.annotate(f'({intersection_T:.3f}, {intersection_Sa:.3f})', 
-                    xy=(intersection_T, intersection_Sa), 
-                    xytext=(10, 10),
-                    textcoords='offset points',
-                    fontsize=9,
-                    bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5))
-        
-        ax.grid(True)
-        ax.set_xlim(left=0, right=np.max(T))  # Limit x-axis to Tn
-        ax.set_ylim(bottom=0)
-        ax.set_xlabel('Period (T)')
-        ax.set_ylabel('Spectral Acceleration (Sa)')
-        
-        ax.legend()
-        
-        plt.show()
+            ax.plot(T, Sa, color=blueAPE, linewidth=1.5, marker=marker, label='Elastic Spectrum', linestyle=linestyle)
+            ax.plot(T, Sa_reduced, color='k', linewidth=1.5, marker=marker, label='Reduced Spectrum', linestyle=linestyle)
+            
+            # Horizontal line for Sa_lim
+            ax.axhline(y=Sa_lim, color='r', linestyle='--', linewidth=1.5, label='Sa Limit')
+            
+            # Plot intersection point
+            ax.plot(intersection_T, intersection_Sa, 'ro', markersize=8)
+            
+            # Add text annotation for intersection point
+            ax.annotate(f'({intersection_T:.3f}, {intersection_Sa:.3f})', 
+                        xy=(intersection_T, intersection_Sa), 
+                        xytext=(10, 10),
+                        textcoords='offset points',
+                        fontsize=9,
+                        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5))
+            
+            ax.grid(True)
+            ax.set_xlim(left=0, right=np.max(T))  # Limit x-axis to Tn
+            ax.set_ylim(bottom=0)
+            ax.set_xlabel('Period (T)')
+            ax.set_ylabel('Spectral Acceleration (Sa)')
+            
+            ax.legend()
+            
+            plt.show()
+        else:
+            ax.plot(T, Sa, color=blueAPE, linewidth=1.5, marker=marker, label='Elastic Spectrum', linestyle=linestyle)
+            ax.plot(T, Sa_reduced, color='k', linewidth=1.5, marker=marker, label='Reduced Spectrum', linestyle=linestyle)
+            
+            # Horizontal line for Sa_lim
+            ax.axhline(y=Sa_lim, color='r', linestyle='--', linewidth=1.5, label='Sa Limit')
+            
+            # Plot intersection point
+            ax.plot(intersection_T, intersection_Sa, 'ro', markersize=8)
+            
         
     def amplification_factor(self, T_array=np.linspace(0,4,200)):
         def alpha(Tn, To, P):

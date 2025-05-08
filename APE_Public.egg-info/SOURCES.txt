@@ -48,12 +48,15 @@ apeFunctions/__init__.py
 apeFunctions/apeFunctions.py
 baseUnits/__init__.py
 baseUnits/units.py
+concrete/__init__.py
+concrete/concreteBasic.py
 cyclicLoading/__init__.py
 cyclicLoading/cyclicLoading.py
 gmshtools/__init__.py
 gmshtools/gmshtools.py
 plotApeConfig/__init__.py
 plotApeConfig/plotApeConfig.py
+responseSpectrum/Earthquake.py
 responseSpectrum/__init__.py
 steelProperties/AISCDatabase.py
 steelProperties/__init__.py
