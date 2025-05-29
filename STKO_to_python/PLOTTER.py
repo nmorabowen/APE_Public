@@ -105,7 +105,7 @@ class plotter:
         ax.set_ylabel(results_name_verticalAxis or "Vertical Axis")
         ax.grid(True)
         
-        return ax
+        return ax, x_array , y_array
     
         
     @staticmethod

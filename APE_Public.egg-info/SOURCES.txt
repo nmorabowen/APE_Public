@@ -57,6 +57,7 @@ gmshtools/gmshtools.py
 plotApeConfig/__init__.py
 plotApeConfig/plotApeConfig.py
 responseSpectrum/Earthquake.py
+responseSpectrum/Earthquake2D.py
 responseSpectrum/__init__.py
 steelProperties/AISCDatabase.py
 steelProperties/__init__.py
