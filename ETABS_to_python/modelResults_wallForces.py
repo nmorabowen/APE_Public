@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from rapidfuzz import process
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, AutoMinorLocator, MultipleLocator
 
 from plotApeConfig import blueAPE, grayConcrete, set_default_plot_params, color_palette
 set_default_plot_params()
@@ -160,67 +161,74 @@ class modelResults_wallForces(modelResults_utilities):
     
     def plot_wall_force_envelopes(self, pier_label, figsize=(10, 6)):
 
-        load_combinations=self.load_combinations
-        shear_amplification_factor=self.shear_amplification
-        
+        load_combinations = self.load_combinations
+        shear_amplification_factor = self.shear_amplification
+
         # Filter data for the specified wall and load combinations
-        wall_data = self.df[(self.df['Pier']==pier_label) & self.df['Combo'].isin(load_combinations)]
-        
+        wall_data = self.df[(self.df['Pier'] == pier_label) & self.df['Combo'].isin(load_combinations)]
+
         # Calculate envelopes for each force type
         envelopes = {
             'P': wall_data.groupby('Elevation')['P'].agg(['min', 'max']),
             'M3': wall_data.groupby('Elevation')['M3'].agg(['min', 'max']),
             'V2': wall_data.groupby('Elevation')['V2'].agg(['min', 'max'])
         }
-        
+
         # Create subplots
         fig, axes = plt.subplots(1, 3, figsize=figsize)
-        
+
         # Set title
         plt.suptitle(f'Design Force Envelopes - Wall: {pier_label}')
-        
+
         # Define the plotting parameters
         plot_params = [
             {'data': 'P', 'xlabel': 'Axial Force', 'symbol': 'P_u'},
             {'data': 'M3', 'xlabel': 'Bending Moment', 'symbol': 'M_u'},
             {'data': 'V2', 'xlabel': 'Shear Force', 'symbol': 'V_u'}
         ]
-        
+
         # Plot each force type
         for ax_idx, params in enumerate(plot_params):
             ax = axes[ax_idx]
             force_type = params['data']
             envelope = envelopes[force_type]
-            
+
             # Plot min/max envelopes
-            ax.plot(envelope['min'], envelope.index, marker='.', linewidth=1.5, 
-                color='black', label='Envelope')
-            ax.plot(envelope['max'], envelope.index, marker='.', linewidth=1.5, 
-                color='black')
-            
+            ax.plot(envelope['min'], envelope.index, marker='.', linewidth=1.5,
+                    color='black', label='Envelope')
+            ax.plot(envelope['max'], envelope.index, marker='.', linewidth=1.5,
+                    color='black')
+
             # Add amplified shear if it's the shear force plot
             if force_type == 'V2' and shear_amplification_factor != 1.0:
-                ax.plot(envelope['min'] * shear_amplification_factor, envelope.index, 
-                    marker='.', linewidth=1.5, color='blue', linestyle='--', 
-                    label=f'Amplified ({shear_amplification_factor}×)')
-                ax.plot(envelope['max'] * shear_amplification_factor, envelope.index, 
-                    marker='.', linewidth=1.5, color='blue', linestyle='--')
-            
-            # Configure axis
-            ax.set_xlabel(f"{params['xlabel']} - ${params['symbol']}")
-            ax.set_ylabel('Elevation')
-            
-            # Set y-axis limits and ticks
+                ax.plot(envelope['min'] * shear_amplification_factor, envelope.index,
+                        marker='.', linewidth=1.5, color='blue', linestyle='--',
+                        label=f'Amplified ({shear_amplification_factor}×)')
+                ax.plot(envelope['max'] * shear_amplification_factor, envelope.index,
+                        marker='.', linewidth=1.5, color='blue', linestyle='--')
+
+            # Configure axis labels
+            ax.set_xlabel(f"{params['xlabel']} - ${params['symbol']}$")
+            ax.set_ylabel('Elevation [m]')
+
+            # Set y-axis range
             ax.set_ylim(envelope.index.min(), envelope.index.max())
-            ax.set_yticks(envelope.index)
-            
+
+            # Only use minor ticks
+            ax.tick_params(axis='both', which='major', length=0)  # hide major ticks
+            ax.minorticks_on()
+            ax.tick_params(axis='both', which='minor', length=4, width=1, color='black')
+
+            # Optional: customize density of minor ticks
+            ax.yaxis.set_minor_locator(MultipleLocator(1))     # minor ticks every 1 unit in elevation
+            ax.xaxis.set_minor_locator(AutoMinorLocator(5))    # 4 minor ticks between x-ticks
+
             # Add legend if needed
             if force_type == 'V2' and shear_amplification_factor != 1.0:
                 ax.legend()
-        
-        # Adjust layout to prevent overlap
+
+        # Adjust layout
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        
         return fig, axes
     
     
